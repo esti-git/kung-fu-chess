@@ -4,7 +4,8 @@ import java.util.List;
 
 public class Main {
 
-    static Board board = new Board();
+    // כאן אנחנו מגדירים את הלוח דרך הממשק הכללי, ומאתחלים אותו כ-MatrixBoard
+    static Board board = new MatrixBoard();
 
     static int selectedRow = -1;
     static int selectedCol = -1;
@@ -213,12 +214,11 @@ public class Main {
             if (movingColor == destinationPiece.getColor()) return false;
         }
 
-        // שימוש בפונקציה הגנרית של הכלי לבדיקת תבנית התנועה שלו
+        // קריאה לפולימורפיזם של הכלי
         if (!movingPiece.isMovementPatternLegal(fromRow, fromCol, toRow, toCol, board.getRows())) {
             return false;
         }
 
-        // בדיקות ספציפיות שתלויות במצב הלוח הנוכחי (חסימות מסלול והכאות רגלי)
         char pieceType = movingPiece.getType();
         if (pieceType == 'R' || pieceType == 'B' || pieceType == 'Q') {
             return isPathClear(fromRow, fromCol, toRow, toCol);
@@ -248,7 +248,7 @@ public class Main {
                 }
             }
             if (deltaCol == 1) {
-                return destinationPiece != null; // הכאה דורשת כלי יעד
+                return destinationPiece != null;
             }
         }
 
@@ -314,7 +314,8 @@ public class Main {
             if (finalPiece.getType() == 'P') {
                 int promotionRow = (finalPiece.getColor() == 'w') ? 0 : (board.getRows() - 1);
                 if (move.toRow == promotionRow) {
-                    finalPiece = new Piece(finalPiece.getColor(), 'Q');
+                    // הכתרה גנרית ופולימורפית: מייצרים אובייקט מסוג Queen
+                    finalPiece = new Queen(finalPiece.getColor());
                 }
             }
 
