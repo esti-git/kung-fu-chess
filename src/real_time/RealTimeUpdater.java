@@ -1,0 +1,92 @@
+package real_time;
+
+import interfaces.Board;
+import interfaces.Piece;
+import engine.GameEngine;
+import model.PendingJump;
+import model.PendingMove;
+import pieces.Queen;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class RealTimeUpdater {
+
+    private final Board board;
+    private final GameEngine engine;
+
+    public RealTimeUpdater(Board board, GameEngine engine) {
+        this.board = board;
+        this.engine = engine;
+    }
+
+    public void advance(long ms) {
+        engine.advanceClock(ms);
+        updateBoardPositions();
+    }
+
+    private void updateBoardPositions() {
+        List<PendingMove> pendingMoves = engine.pendingMoves;
+        List<PendingJump> pendingJumps = engine.pendingJumps;
+        long gameClock = engine.getGameClock();
+
+        List<PendingMove> completedMoves = new ArrayList<>();
+        for (PendingMove move : pendingMoves) {
+            if (gameClock >= move.getArrivalTime()) {
+                completedMoves.add(move);
+            }
+        }
+
+        for (PendingMove move : completedMoves) {
+            board.setPieceAt(move.getFromRow(), move.getFromCol(), null);
+        }
+
+        for (PendingMove move : completedMoves) {
+            boolean capturedByAirborne = false;
+
+            for (PendingJump jump : pendingJumps) {
+                if (move.getArrivalTime() >= jump.getStartTime() && move.getArrivalTime() <= jump.getEndTime()) {
+                    if (jump.getRow() == move.getToRow() && jump.getCol() == move.getToCol()) {
+                        if (jump.getPiece().getColor() != move.getPiece().getColor()) {
+                            capturedByAirborne = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (capturedByAirborne) {
+                if (move.getPiece().getType() == 'K') engine.setGameOver(true);
+                continue;
+            }
+
+            Piece target = board.getPieceAt(move.getToRow(), move.getToCol());
+            if (target != null && target.getType() == 'K') {
+                engine.setGameOver(true);
+            }
+
+            Piece finalPiece = move.getPiece();
+            if (finalPiece.getType() == 'P') {
+                int promotionRow = (finalPiece.getColor() == 'w') ? 0 : (board.getRows() - 1);
+                if (move.getToRow() == promotionRow) {
+                    finalPiece = new Queen(finalPiece.getColor());
+                }
+            }
+
+            board.setPieceAt(move.getToRow(), move.getToCol(), finalPiece);
+        }
+
+        pendingMoves.removeAll(completedMoves);
+
+        List<PendingJump> completedJumps = new ArrayList<>();
+        for (PendingJump jump : pendingJumps) {
+            if (gameClock >= jump.getEndTime()) {
+                completedJumps.add(jump);
+                if (board.isEmpty(jump.getRow(), jump.getCol())) {
+                    board.setPieceAt(jump.getRow(), jump.getCol(), jump.getPiece());
+                }
+            }
+        }
+        pendingJumps.removeAll(completedJumps);
+    }
+}

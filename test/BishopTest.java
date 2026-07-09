@@ -1,4 +1,7 @@
+import interfaces.Piece;
 import org.junit.jupiter.api.Test;
+import pieces.Bishop;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class BishopTest {

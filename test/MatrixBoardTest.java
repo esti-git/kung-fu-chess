@@ -1,4 +1,8 @@
+import board.MatrixBoard;
+import interfaces.Piece;
 import org.junit.jupiter.api.Test;
+import pieces.Queen;
+
 import java.util.ArrayList;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
