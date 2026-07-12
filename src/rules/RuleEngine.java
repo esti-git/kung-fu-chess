@@ -23,29 +23,21 @@ public class RuleEngine {
     public boolean isMoveLegal(int fromRow, int fromCol, int toRow, int toCol) {
         if (fromRow == toRow && fromCol == toCol) return false;
 
-        for (PendingJump jump : pendingJumps) {
-            if (jump.getRow() == fromRow && jump.getCol() == fromCol) return false;
-        }
-
         Piece movingPiece = board.getPieceAt(new Position(fromRow, fromCol));
+        if (movingPiece == null) return false;
         enums.PieceColor movingColor = movingPiece.getColor();
 
         for (PendingJump jump : pendingJumps) {
+            if (jump.getRow() == fromRow && jump.getCol() == fromCol) return false;
             if (jump.getRow() == toRow && jump.getCol() == toCol) {
                 if (jump.getPiece().getColor() == movingColor) return false;
             }
         }
 
         for (PendingMove move : pendingMoves) {
-            if (move.getPiece().getColor() != movingColor) return false;
-        }
-
-        for (PendingMove move : pendingMoves) {
             if (move.getFromRow() == fromRow && move.getFromCol() == fromCol) return false;
-        }
-
-        for (PendingMove move : pendingMoves) {
-            if (move.getToRow() == toRow && move.getToCol() == toCol) return false;
+            if (move.getToRow() == toRow && move.getToCol() == toCol
+                    && move.getPiece().getColor() == movingColor) return false;
         }
 
         Piece destinationPiece = board.getPieceAt(new Position(toRow, toCol));
@@ -73,11 +65,18 @@ public class RuleEngine {
                     return board.isEmpty(new Position(toRow, toCol));
                 }
                 if (actualRowDirection == expectedRowDirection * 2) {
+                    int startRow = (movingColor == enums.PieceColor.WHITE) ? (board.getRows() - 2) : 1;
+                    if (fromRow != startRow) return false;
                     int middleRow = fromRow + expectedRowDirection;
+                    
                     if (!board.isEmpty(new Position(middleRow, fromCol)) || !board.isEmpty(new Position(toRow, toCol))) {
                         return false;
                     }
+                    
                     for (PendingMove move : pendingMoves) {
+                        if (move.getPiece().getId() == movingPiece.getId()) {
+                            continue;
+                        }
                         if ((move.getToRow() == middleRow && move.getToCol() == fromCol) ||
                                 (move.getToRow() == toRow && move.getToCol() == toCol)) {
                             return false;

@@ -12,8 +12,9 @@ import rules.pieces.Rook;
 
 public class PieceFactory {
 
-    public static Piece create(int id, PieceColor color, char kindChar, Position cell) {
+public static Piece create(int id, PieceColor color, char kindChar, Position cell) {
         Piece piece;
+        
         switch (kindChar) {
             case 'K': piece = new King(id, color); break;
             case 'Q': piece = new Queen(id, color); break;
@@ -23,6 +24,7 @@ public class PieceFactory {
             case 'P': piece = new Pawn(id, color); break;
             default:  return null;
         }
+        
         piece.setCell(cell);
         return piece;
     }

@@ -38,13 +38,20 @@ public class RealTimeUpdater {
             }
         }
 
-        for (PendingMove move : completedMoves) {
-            board.setPieceAt(new Position(move.getFromRow(), move.getFromCol()), null);
-        }
+        completedMoves.sort((a, b) -> Long.compare(a.getArrivalTime(), b.getArrivalTime()));
 
         for (PendingMove move : completedMoves) {
+            Position fromPos = new Position(move.getFromRow(), move.getFromCol());
+            Position toPos = new Position(move.getToRow(), move.getToCol());
+
+            Piece currentPieceOnSrc = board.getPieceAt(fromPos);
+            if (currentPieceOnSrc == null || currentPieceOnSrc.getId() != move.getPiece().getId()) {
+                continue; 
+            }
+
+            board.setPieceAt(fromPos, null);
+
             boolean capturedByAirborne = false;
-
             for (PendingJump jump : pendingJumps) {
                 if (move.getArrivalTime() >= jump.getStartTime() && move.getArrivalTime() <= jump.getEndTime()) {
                     if (jump.getRow() == move.getToRow() && jump.getCol() == move.getToCol()) {
@@ -61,13 +68,19 @@ public class RealTimeUpdater {
                 continue;
             }
 
-            Piece target = board.getPieceAt(new Position(move.getToRow(), move.getToCol()));
-            if (target != null && target.getKind() == PieceKind.KING) {
-                engine.setGameOver(true);
+            Piece target = board.getPieceAt(toPos);
+            if (target != null) {
+                if (target.getKind() == PieceKind.KING) engine.setGameOver(true);
+                if (target.getColor() == move.getPiece().getColor()) {
+                    // אם מדובר בכלי מאותו צבע (לא אמור לקרות אם הבדיקה המוקדמת חסמה, אך ליתר ביטחון)
+                    // מחזירים את הכלי למקור שלו כדי שלא ייעלם
+                    board.setPieceAt(fromPos, move.getPiece());
+                    continue;
+                }
             }
 
             Piece finalPiece = PawnPromotion.applyPromotion(move.getPiece(), move.getToRow(), board.getRows());
-            board.setPieceAt(new Position(move.getToRow(), move.getToCol()), finalPiece);
+            board.setPieceAt(toPos, finalPiece);
         }
 
         pendingMoves.removeAll(completedMoves);
