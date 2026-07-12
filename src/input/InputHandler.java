@@ -3,6 +3,7 @@ package input;
 import board.MatrixBoard;
 import engine.GameEngine;
 import io.BoardPrinter;
+import model.GameState;
 import realTime.RealTimeUpdater;
 
 import java.util.ArrayList;
@@ -16,8 +17,10 @@ public class InputHandler {
     private final Controller controller;
 
     public InputHandler() {
-        GameEngine engine = new GameEngine(board);
-        RealTimeUpdater updater = new RealTimeUpdater(board, engine);
+        GameState state = new GameState();
+        state.setBoard(board);
+        GameEngine engine = new GameEngine(state);
+        RealTimeUpdater updater = new RealTimeUpdater(engine);
         BoardPrinter printer = new BoardPrinter(board);
         this.boardMapper = new BoardMapper(board);
         this.controller = new Controller(engine, updater, printer);

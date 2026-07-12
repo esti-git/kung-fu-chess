@@ -3,23 +3,20 @@ package realTime;
 import model.Board;
 import model.Piece;
 import engine.GameEngine;
-import enums.PieceColor;
 import enums.PieceKind;
 import model.PendingJump;
 import model.PendingMove;
 import model.Position;
-import rules.pieces.Queen;
+import rules.PawnPromotion;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class RealTimeUpdater {
 
-    private final Board board;
     private final GameEngine engine;
 
-    public RealTimeUpdater(Board board, GameEngine engine) {
-        this.board = board;
+    public RealTimeUpdater(GameEngine engine) {
         this.engine = engine;
     }
 
@@ -29,6 +26,7 @@ public class RealTimeUpdater {
     }
 
     private void updateBoardPositions() {
+        Board board = engine.getState().getBoard();
         List<PendingMove> pendingMoves = engine.getPendingMoves();
         List<PendingJump> pendingJumps = engine.getPendingJumps();
         long gameClock = engine.getGameClock();
@@ -68,14 +66,7 @@ public class RealTimeUpdater {
                 engine.setGameOver(true);
             }
 
-            Piece finalPiece = move.getPiece();
-            if (finalPiece.getKind() == PieceKind.PAWN) {
-                int promotionRow = (finalPiece.getColor() == PieceColor.WHITE) ? 0 : (board.getRows() - 1);
-                if (move.getToRow() == promotionRow) {
-                    finalPiece = new Queen(finalPiece.getId(), finalPiece.getColor());
-                }
-            }
-
+            Piece finalPiece = PawnPromotion.applyPromotion(move.getPiece(), move.getToRow(), board.getRows());
             board.setPieceAt(new Position(move.getToRow(), move.getToCol()), finalPiece);
         }
 

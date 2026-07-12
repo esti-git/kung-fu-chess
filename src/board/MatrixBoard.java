@@ -25,13 +25,13 @@ public class MatrixBoard implements Board {
 
     @Override
     public Piece getPieceAt(Position pos) {
-        if (pos == null || pos.getRow() < 0 || pos.getRow() >= rows || pos.getCol() < 0 || pos.getCol() >= cols) return null;
+        if (!isValidPosition(pos)) return null;
         return matrix[pos.getRow()][pos.getCol()];
     }
 
     @Override
     public void setPieceAt(Position pos, Piece piece) {
-        if (pos != null && pos.getRow() >= 0 && pos.getRow() < rows && pos.getCol() >= 0 && pos.getCol() < cols) {
+        if (isValidPosition(pos)) {
             matrix[pos.getRow()][pos.getCol()] = piece;
         }
     }

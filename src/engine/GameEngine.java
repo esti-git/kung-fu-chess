@@ -1,58 +1,49 @@
 package engine;
 
-import model.Board;
+import config.GameConfig;
+import enums.PieceColor;
+import model.GameState;
 import model.Piece;
 import model.PendingJump;
 import model.PendingMove;
 import model.Position;
-import enums.PieceColor;
 import rules.RuleEngine;
 
-import java.util.ArrayList;
 import java.util.List;
-
-import config.GameConfig;
 
 public class GameEngine {
 
-    private final Board board;
+    private final GameState state;
     private final RuleEngine ruleEngine;
 
-    private int selectedRow = -1;
-    private int selectedCol = -1;
-    private long gameClock = 0;
-    private boolean isGameOver = false;
-
-    public List<PendingMove> pendingMoves = new ArrayList<>();
-    public List<PendingJump> pendingJumps = new ArrayList<>();
-
-    public List<PendingMove> getPendingMoves() { return pendingMoves; }
-    public List<PendingJump> getPendingJumps() { return pendingJumps; }
-
-    public GameEngine(Board board) {
-        this.board = board;
-        this.ruleEngine = new RuleEngine(board, pendingMoves, pendingJumps);
+    public GameEngine(GameState state) {
+        this.state = state;
+        this.ruleEngine = new RuleEngine(state.getBoard(), state.getPendingMoves(), state.getPendingJumps());
     }
 
-    public boolean isGameOver() { return isGameOver; }
-    public void setGameOver(boolean value) { isGameOver = value; }
-    public long getGameClock() { return gameClock; }
-    public void advanceClock(long ms) { gameClock += ms; }
+    public GameState getState() { return state; }
+
+    public boolean isGameOver() { return state.isGameOver(); }
+    public void setGameOver(boolean value) { state.setGameOver(value); }
+    public long getGameClock() { return state.getGameClock(); }
+    public void advanceClock(long ms) { state.setGameClock(state.getGameClock() + ms); }
+
+    public List<PendingMove> getPendingMoves() { return state.getPendingMoves(); }
+    public List<PendingJump> getPendingJumps() { return state.getPendingJumps(); }
 
     public void handleClick(int x, int y) {
         int clickedCol = x / GameConfig.CELL_SIZE;
         int clickedRow = y / GameConfig.CELL_SIZE;
 
-        if (clickedRow < 0 || clickedRow >= board.getRows() || clickedCol < 0 || clickedCol >= board.getCols()) {
-            return;
-        }
+        if (!state.getBoard().isValidPosition(new Position(clickedRow, clickedCol))) return;
 
-        Piece currentSquarePiece = board.getPieceAt(new Position(clickedRow, clickedCol));
+        Piece currentSquarePiece = state.getBoard().getPieceAt(new Position(clickedRow, clickedCol));
+        Position clickedPos = new Position(clickedRow, clickedCol);
 
-        if (hasSelection() && selectedRow == clickedRow && selectedCol == clickedCol) {
+        if (hasSelection() && state.getSelectedPosition().equals(clickedPos)) {
             if (canPieceJump(clickedRow, clickedCol)) {
-                pendingJumps.add(new PendingJump(clickedRow, clickedCol, board.getPieceAt(new Position(clickedRow, clickedCol)), gameClock));
-                board.setPieceAt(new Position(clickedRow, clickedCol), null);
+                state.getPendingJumps().add(new PendingJump(clickedRow, clickedCol, currentSquarePiece, state.getGameClock()));
+                state.getBoard().setPieceAt(clickedPos, null);
             }
             clearSelection();
             return;
@@ -62,22 +53,22 @@ public class GameEngine {
             PieceColor currentPieceColor = currentSquarePiece.getColor();
 
             if (hasSelection() && getSelectedPieceColor() == currentPieceColor) {
-                selectedRow = clickedRow;
-                selectedCol = clickedCol;
+                state.setSelectedPosition(clickedPos);
             } else if (hasSelection()) {
-                if (ruleEngine.isMoveLegal(selectedRow, selectedCol, clickedRow, clickedCol)) {
-                    executeMove(selectedRow, selectedCol, clickedRow, clickedCol);
+                Position sel = state.getSelectedPosition();
+                if (ruleEngine.isMoveLegal(sel.getRow(), sel.getCol(), clickedRow, clickedCol)) {
+                    executeMove(sel.getRow(), sel.getCol(), clickedRow, clickedCol);
                 } else {
                     clearSelection();
                 }
             } else {
-                selectedRow = clickedRow;
-                selectedCol = clickedCol;
+                state.setSelectedPosition(clickedPos);
             }
         } else {
             if (hasSelection()) {
-                if (ruleEngine.isMoveLegal(selectedRow, selectedCol, clickedRow, clickedCol)) {
-                    executeMove(selectedRow, selectedCol, clickedRow, clickedCol);
+                Position sel = state.getSelectedPosition();
+                if (ruleEngine.isMoveLegal(sel.getRow(), sel.getCol(), clickedRow, clickedCol)) {
+                    executeMove(sel.getRow(), sel.getCol(), clickedRow, clickedCol);
                 } else {
                     clearSelection();
                 }
@@ -89,48 +80,39 @@ public class GameEngine {
         int clickedCol = x / GameConfig.CELL_SIZE;
         int clickedRow = y / GameConfig.CELL_SIZE;
 
-        if (clickedRow < 0 || clickedRow >= board.getRows() || clickedCol < 0 || clickedCol >= board.getCols()) {
-            return;
-        }
+        if (!state.getBoard().isValidPosition(new Position(clickedRow, clickedCol))) return;
 
-        Piece currentPiece = board.getPieceAt(new Position(clickedRow, clickedCol));
-        if (currentPiece != null) {
-            if (canPieceJump(clickedRow, clickedCol)) {
-                pendingJumps.add(new PendingJump(clickedRow, clickedCol, currentPiece, gameClock));
-                board.setPieceAt(new Position(clickedRow, clickedCol), null);
-            }
+        Piece currentPiece = state.getBoard().getPieceAt(new Position(clickedRow, clickedCol));
+        if (currentPiece != null && canPieceJump(clickedRow, clickedCol)) {
+            state.getPendingJumps().add(new PendingJump(clickedRow, clickedCol, currentPiece, state.getGameClock()));
+            state.getBoard().setPieceAt(new Position(clickedRow, clickedCol), null);
         }
         clearSelection();
     }
 
     public boolean canPieceJump(int r, int c) {
-        for (PendingMove move : pendingMoves) {
+        for (PendingMove move : state.getPendingMoves()) {
             if (move.getFromRow() == r && move.getFromCol() == c) return false;
         }
-        for (PendingJump jump : pendingJumps) {
+        for (PendingJump jump : state.getPendingJumps()) {
             if (jump.getRow() == r && jump.getCol() == c) return false;
         }
         return true;
     }
 
     public void executeMove(int fromRow, int fromCol, int toRow, int toCol) {
-        Piece piece = board.getPieceAt(new Position(fromRow, fromCol));
+        Piece piece = state.getBoard().getPieceAt(new Position(fromRow, fromCol));
         int distance = Math.max(Math.abs(toRow - fromRow), Math.abs(toCol - fromCol));
-        long arrivalTime = gameClock + distance * GameConfig.MS_PER_CELL;
-        pendingMoves.add(new PendingMove(fromRow, fromCol, toRow, toCol, piece, arrivalTime));
+        long arrivalTime = state.getGameClock() + distance * GameConfig.MS_PER_CELL;
+        state.getPendingMoves().add(new PendingMove(fromRow, fromCol, toRow, toCol, piece, arrivalTime));
         clearSelection();
     }
 
-    private boolean hasSelection() {
-        return selectedRow != -1 && selectedCol != -1;
-    }
+    private boolean hasSelection() { return state.getSelectedPosition() != null; }
 
     private PieceColor getSelectedPieceColor() {
-        return board.getPieceAt(new Position(selectedRow, selectedCol)).getColor();
+        return state.getBoard().getPieceAt(state.getSelectedPosition()).getColor();
     }
 
-    private void clearSelection() {
-        selectedRow = -1;
-        selectedCol = -1;
-    }
+    private void clearSelection() { state.setSelectedPosition(null); }
 }
