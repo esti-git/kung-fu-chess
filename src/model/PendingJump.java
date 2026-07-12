@@ -1,5 +1,6 @@
 package model;
 
+import config.GameConfig;
 import model.Piece;
 
 public class PendingJump {
@@ -13,7 +14,7 @@ public class PendingJump {
         this.col = col;
         this.piece = piece;
         this.startTime = startTime;
-        this.endTime = startTime + 1000L;
+        this.endTime = startTime + GameConfig.JUMP_DURATION_MS;
     }
 
     public int getRow() { return row; }

@@ -11,6 +11,8 @@ import rules.RuleEngine;
 import java.util.ArrayList;
 import java.util.List;
 
+import config.GameConfig;
+
 public class GameEngine {
 
     private final Board board;
@@ -38,8 +40,8 @@ public class GameEngine {
     public void advanceClock(long ms) { gameClock += ms; }
 
     public void handleClick(int x, int y) {
-        int clickedCol = x / 100;
-        int clickedRow = y / 100;
+        int clickedCol = x / GameConfig.CELL_SIZE;
+        int clickedRow = y / GameConfig.CELL_SIZE;
 
         if (clickedRow < 0 || clickedRow >= board.getRows() || clickedCol < 0 || clickedCol >= board.getCols()) {
             return;
@@ -84,8 +86,8 @@ public class GameEngine {
     }
 
     public void handleJumpCommand(int x, int y) {
-        int clickedCol = x / 100;
-        int clickedRow = y / 100;
+        int clickedCol = x / GameConfig.CELL_SIZE;
+        int clickedRow = y / GameConfig.CELL_SIZE;
 
         if (clickedRow < 0 || clickedRow >= board.getRows() || clickedCol < 0 || clickedCol >= board.getCols()) {
             return;
@@ -114,7 +116,7 @@ public class GameEngine {
     public void executeMove(int fromRow, int fromCol, int toRow, int toCol) {
         Piece piece = board.getPieceAt(new Position(fromRow, fromCol));
         int distance = Math.max(Math.abs(toRow - fromRow), Math.abs(toCol - fromCol));
-        long arrivalTime = gameClock + distance * 1000L;
+        long arrivalTime = gameClock + distance * GameConfig.MS_PER_CELL;
         pendingMoves.add(new PendingMove(fromRow, fromCol, toRow, toCol, piece, arrivalTime));
         clearSelection();
     }
