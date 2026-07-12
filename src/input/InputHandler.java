@@ -1,14 +1,14 @@
 package input;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+
 import board.MatrixBoard;
 import engine.GameEngine;
 import io.BoardPrinter;
 import model.GameState;
 import realTime.RealTimeUpdater;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
 
 public class InputHandler {
 
@@ -22,8 +22,11 @@ public class InputHandler {
         GameEngine engine = new GameEngine(state);
         RealTimeUpdater updater = new RealTimeUpdater(engine);
         BoardPrinter printer = new BoardPrinter(board);
+        
         this.boardMapper = new BoardMapper(board);
-        this.controller = new Controller(engine, updater, printer);
+        
+        CommandRegistry registry = new CommandRegistry(engine, updater, printer);
+        this.controller = new Controller(engine, registry);
     }
 
     public void run() {

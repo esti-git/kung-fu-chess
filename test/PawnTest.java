@@ -16,7 +16,7 @@ class PawnTest {
     @Test
     void testWhitePawnTwoStepsFromStartRow() {
         Piece pawn = new Pawn(1, PieceColor.WHITE);
-        assertTrue(pawn.isMovementPatternLegal(7, 4, 5, 4, 8));
+        assertTrue(pawn.isMovementPatternLegal(6, 4, 4, 4, 8));
     }
 
     @Test
@@ -40,7 +40,7 @@ class PawnTest {
     @Test
     void testBlackPawnTwoStepsFromStartRow() {
         Piece pawn = new Pawn(1, PieceColor.BLACK);
-        assertTrue(pawn.isMovementPatternLegal(0, 2, 2, 2, 8));
+        assertTrue(pawn.isMovementPatternLegal(1, 2, 3, 2, 8));
     }
 
     @Test
