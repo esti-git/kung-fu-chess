@@ -2,7 +2,7 @@ package input;
 
 import engine.GameEngine;
 import io.BoardPrinter;
-import real_time.RealTimeUpdater;
+import realTime.RealTimeUpdater;
 
 public class Controller {
 

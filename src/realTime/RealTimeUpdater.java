@@ -1,4 +1,4 @@
-package real_time;
+package realTime;
 
 import model.Board;
 import model.Piece;

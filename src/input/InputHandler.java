@@ -3,7 +3,7 @@ package input;
 import board.MatrixBoard;
 import engine.GameEngine;
 import io.BoardPrinter;
-import real_time.RealTimeUpdater;
+import realTime.RealTimeUpdater;
 
 import java.util.ArrayList;
 import java.util.List;
