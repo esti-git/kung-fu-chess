@@ -1,89 +1,90 @@
 import board.MatrixBoard;
-import interfaces.Piece;
+import enums.PieceColor;
+import enums.PieceKind;
+import io.BoardParser;
+import model.Piece;
+import model.Position;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import pieces.Queen;
+import rules.pieces.Queen;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class MatrixBoardTest {
 
+    private MatrixBoard board;
+    private BoardParser parser;
+
+    @BeforeEach
+    void setUp() {
+        parser = new BoardParser();
+        board = new MatrixBoard();
+        List<String> rawLines = Arrays.asList("wR . bK", ". wP .");
+        List<Piece> pieces = parser.parse(rawLines);
+        board.initialize(pieces, parser.parseRows(rawLines), parser.parseCols(rawLines));
+    }
+
     @Test
-    void testValidBoardInitialization() {
-        MatrixBoard board = new MatrixBoard();
-        List<String> rawLines = new ArrayList<>();
-        rawLines.add("wR .  bK");
-        rawLines.add(".  wP .");
-
-        // וידוא שהאתחול מצליח
-        boolean success = board.validateAndInitialize(rawLines);
-        assertTrue(success, "הלוח אמור להתאתחל בהצלחה עבור קלט תקין");
-
-        // בדיקת ממדי הלוח
+    void testBoardDimensions() {
         assertEquals(2, board.getRows());
         assertEquals(3, board.getCols());
-
-        // בדיקה שהכלים נוצרו מסוג הקלאס הנכון (פולימורפיזם)
-        assertNotNull(board.getPieceAt(0, 0));
-        assertEquals('R', board.getPieceAt(0, 0).getType());
-        assertEquals('w', board.getPieceAt(0, 0).getColor());
-
-        // בדיקת משבצת ריקה
-        assertTrue(board.isEmpty(0, 1));
-        assertNull(board.getPieceAt(0, 1));
-
-        // בדיקה של כלי אויב בשורה הראשונה
-        assertEquals('K', board.getPieceAt(0, 2).getType());
-        assertEquals('b', board.getPieceAt(0, 2).getColor());
     }
 
     @Test
-    void testInvalidBoardRowWidthMismatch() {
-        MatrixBoard board = new MatrixBoard();
-        List<String> rawLines = new ArrayList<>();
-        rawLines.add("wR . bK");
-        rawLines.add(". wP"); // שורה קצרה יותר (רק 2 עמודות במקום 3)
-
-        boolean success = board.validateAndInitialize(rawLines);
-        assertFalse(success, "האתחול אמור להיכשל כשיש חוסר התאמה באורך השורות");
+    void testPieceKindAndColor() {
+        assertEquals(PieceKind.ROOK, board.getPieceAt(new Position(0, 0)).getKind());
+        assertEquals(PieceColor.WHITE, board.getPieceAt(new Position(0, 0)).getColor());
+        assertEquals(PieceKind.KING, board.getPieceAt(new Position(0, 2)).getKind());
+        assertEquals(PieceColor.BLACK, board.getPieceAt(new Position(0, 2)).getColor());
     }
 
     @Test
-    void testInvalidBoardUnknownToken() {
-        MatrixBoard board = new MatrixBoard();
-        List<String> rawLines = new ArrayList<>();
-        rawLines.add("wR . bK");
-        rawLines.add(". wX ."); // כלי בשם X לא קיים במשחק
-
-        boolean success = board.validateAndInitialize(rawLines);
-        assertFalse(success, "האתחול אמור להיכשל כשיש סימן (Token) לא מוכר");
+    void testEmptyCell() {
+        assertTrue(board.isEmpty(new Position(0, 1)));
+        assertNull(board.getPieceAt(new Position(0, 1)));
     }
 
     @Test
     void testGetPieceAtOutOfBounds() {
-        MatrixBoard board = new MatrixBoard();
-        List<String> rawLines = new ArrayList<>();
-        rawLines.add(". .");
-        board.validateAndInitialize(rawLines);
+        assertNull(board.getPieceAt(new Position(-1, 0)));
+        assertNull(board.getPieceAt(new Position(5, 5)));
+        assertNull(board.getPieceAt(null));
+    }
 
-        // פנייה מחוץ לגבולות המטריצה צריכה להחזיר null בבטחה ולא להקריס את התוכנית
-        assertNull(board.getPieceAt(-1, 0), "חריגה מלמעלה צריכה להחזיר null");
-        assertNull(board.getPieceAt(5, 5), "חריגה ימינה/למטה צריכה להחזיר null");
+    @Test
+    void testIsValidPosition() {
+        assertTrue(board.isValidPosition(new Position(0, 0)));
+        assertFalse(board.isValidPosition(new Position(-1, 0)));
+        assertFalse(board.isValidPosition(new Position(5, 5)));
+        assertFalse(board.isValidPosition(null));
     }
 
     @Test
     void testSetPieceAt() {
-        MatrixBoard board = new MatrixBoard();
-        List<String> rawLines = new ArrayList<>();
-        rawLines.add(". .");
-        board.validateAndInitialize(rawLines);
+        Piece queen = new Queen(10, PieceColor.WHITE);
+        board.setPieceAt(new Position(0, 1), queen);
+        assertFalse(board.isEmpty(new Position(0, 1)));
+        assertEquals(PieceKind.QUEEN, board.getPieceAt(new Position(0, 1)).getKind());
+    }
 
-        // יצירת כלי חדש ידנית והשמתו על הלוח
-        Piece newQueen = new Queen('w');
-        board.setPieceAt(0, 1, newQueen);
+    @Test
+    void testSetPieceAtNull() {
+        board.setPieceAt(new Position(0, 0), null);
+        assertTrue(board.isEmpty(new Position(0, 0)));
+    }
 
-        assertFalse(board.isEmpty(0, 1), "המשבצת לא אמורה להיות ריקה לאחר ההשמה");
-        assertEquals('Q', board.getPieceAt(0, 1).getType());
+    @Test
+    void testParserInvalidRowWidth() {
+        List<String> rawLines = Arrays.asList("wR . bK", ". wP");
+        assertNull(parser.parse(rawLines));
+    }
+
+    @Test
+    void testParserInvalidToken() {
+        List<String> rawLines = Arrays.asList("wR . bK", ". wX .");
+        assertNull(parser.parse(rawLines));
     }
 }

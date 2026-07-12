@@ -1,11 +1,14 @@
 package real_time;
 
-import interfaces.Board;
-import interfaces.Piece;
+import model.Board;
+import model.Piece;
 import engine.GameEngine;
+import enums.PieceColor;
+import enums.PieceKind;
 import model.PendingJump;
 import model.PendingMove;
-import pieces.Queen;
+import model.Position;
+import rules.pieces.Queen;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,8 +29,8 @@ public class RealTimeUpdater {
     }
 
     private void updateBoardPositions() {
-        List<PendingMove> pendingMoves = engine.pendingMoves;
-        List<PendingJump> pendingJumps = engine.pendingJumps;
+        List<PendingMove> pendingMoves = engine.getPendingMoves();
+        List<PendingJump> pendingJumps = engine.getPendingJumps();
         long gameClock = engine.getGameClock();
 
         List<PendingMove> completedMoves = new ArrayList<>();
@@ -38,7 +41,7 @@ public class RealTimeUpdater {
         }
 
         for (PendingMove move : completedMoves) {
-            board.setPieceAt(move.getFromRow(), move.getFromCol(), null);
+            board.setPieceAt(new Position(move.getFromRow(), move.getFromCol()), null);
         }
 
         for (PendingMove move : completedMoves) {
@@ -56,24 +59,24 @@ public class RealTimeUpdater {
             }
 
             if (capturedByAirborne) {
-                if (move.getPiece().getType() == 'K') engine.setGameOver(true);
+                if (move.getPiece().getKind() == PieceKind.KING) engine.setGameOver(true);
                 continue;
             }
 
-            Piece target = board.getPieceAt(move.getToRow(), move.getToCol());
-            if (target != null && target.getType() == 'K') {
+            Piece target = board.getPieceAt(new Position(move.getToRow(), move.getToCol()));
+            if (target != null && target.getKind() == PieceKind.KING) {
                 engine.setGameOver(true);
             }
 
             Piece finalPiece = move.getPiece();
-            if (finalPiece.getType() == 'P') {
-                int promotionRow = (finalPiece.getColor() == 'w') ? 0 : (board.getRows() - 1);
+            if (finalPiece.getKind() == PieceKind.PAWN) {
+                int promotionRow = (finalPiece.getColor() == PieceColor.WHITE) ? 0 : (board.getRows() - 1);
                 if (move.getToRow() == promotionRow) {
-                    finalPiece = new Queen(finalPiece.getColor());
+                    finalPiece = new Queen(finalPiece.getId(), finalPiece.getColor());
                 }
             }
 
-            board.setPieceAt(move.getToRow(), move.getToCol(), finalPiece);
+            board.setPieceAt(new Position(move.getToRow(), move.getToCol()), finalPiece);
         }
 
         pendingMoves.removeAll(completedMoves);
@@ -82,8 +85,8 @@ public class RealTimeUpdater {
         for (PendingJump jump : pendingJumps) {
             if (gameClock >= jump.getEndTime()) {
                 completedJumps.add(jump);
-                if (board.isEmpty(jump.getRow(), jump.getCol())) {
-                    board.setPieceAt(jump.getRow(), jump.getCol(), jump.getPiece());
+                if (board.isEmpty(new Position(jump.getRow(), jump.getCol()))) {
+                    board.setPieceAt(new Position(jump.getRow(), jump.getCol()), jump.getPiece());
                 }
             }
         }

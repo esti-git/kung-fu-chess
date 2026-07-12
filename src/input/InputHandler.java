@@ -3,7 +3,6 @@ package input;
 import board.MatrixBoard;
 import engine.GameEngine;
 import io.BoardPrinter;
-import model.Board;
 import real_time.RealTimeUpdater;
 
 import java.util.ArrayList;
@@ -12,7 +11,7 @@ import java.util.Scanner;
 
 public class InputHandler {
 
-    private final Board board = new MatrixBoard();
+    private final MatrixBoard board = new MatrixBoard();
     private final BoardMapper boardMapper;
     private final Controller controller;
 

@@ -1,20 +1,23 @@
-import interfaces.Piece;
+import enums.PieceColor;
+import model.Piece;
 import org.junit.jupiter.api.Test;
-import pieces.Rook;
+import rules.pieces.Rook;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class RookTest {
 
     @Test
-    void testRookMovementPattern() {
-        Piece rook = new Rook('b');
+    void testStraightMoveIsLegal() {
+        Piece rook = new Rook(1, PieceColor.WHITE);
+        assertTrue(rook.isMovementPatternLegal(3, 3, 3, 7, 8));
+        assertTrue(rook.isMovementPatternLegal(3, 3, 0, 3, 8));
+    }
 
-        // תנועה חוקית לאורך השורה או העמודה
-        assertTrue(rook.isMovementPatternLegal(3, 3, 3, 7, 8)); // ימינה בשורה
-        assertTrue(rook.isMovementPatternLegal(3, 3, 0, 3, 8)); // למעלה בעמודה
-
-        // תנועה באלכסון - אסור לצריח
+    @Test
+    void testDiagonalMoveIsIllegal() {
+        Piece rook = new Rook(1, PieceColor.WHITE);
         assertFalse(rook.isMovementPatternLegal(3, 3, 5, 5, 8));
+        assertFalse(rook.isMovementPatternLegal(3, 3, 1, 5, 8));
     }
 }

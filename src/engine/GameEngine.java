@@ -1,10 +1,12 @@
 package engine;
 
-import interfaces.Board;
-import interfaces.Piece;
+import model.Board;
+import model.Piece;
 import model.PendingJump;
 import model.PendingMove;
-import rules.MoveValidator;
+import model.Position;
+import enums.PieceColor;
+import rules.RuleEngine;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,7 +14,7 @@ import java.util.List;
 public class GameEngine {
 
     private final Board board;
-    private final MoveValidator moveValidator;
+    private final RuleEngine ruleEngine;
 
     private int selectedRow = -1;
     private int selectedCol = -1;
@@ -22,9 +24,12 @@ public class GameEngine {
     public List<PendingMove> pendingMoves = new ArrayList<>();
     public List<PendingJump> pendingJumps = new ArrayList<>();
 
+    public List<PendingMove> getPendingMoves() { return pendingMoves; }
+    public List<PendingJump> getPendingJumps() { return pendingJumps; }
+
     public GameEngine(Board board) {
         this.board = board;
-        this.moveValidator = new MoveValidator(board, pendingMoves, pendingJumps);
+        this.ruleEngine = new RuleEngine(board, pendingMoves, pendingJumps);
     }
 
     public boolean isGameOver() { return isGameOver; }
@@ -40,25 +45,25 @@ public class GameEngine {
             return;
         }
 
-        Piece currentSquarePiece = board.getPieceAt(clickedRow, clickedCol);
+        Piece currentSquarePiece = board.getPieceAt(new Position(clickedRow, clickedCol));
 
         if (hasSelection() && selectedRow == clickedRow && selectedCol == clickedCol) {
             if (canPieceJump(clickedRow, clickedCol)) {
-                pendingJumps.add(new PendingJump(clickedRow, clickedCol, board.getPieceAt(clickedRow, clickedCol), gameClock));
-                board.setPieceAt(clickedRow, clickedCol, null);
+                pendingJumps.add(new PendingJump(clickedRow, clickedCol, board.getPieceAt(new Position(clickedRow, clickedCol)), gameClock));
+                board.setPieceAt(new Position(clickedRow, clickedCol), null);
             }
             clearSelection();
             return;
         }
 
         if (currentSquarePiece != null) {
-            char currentPieceColor = currentSquarePiece.getColor();
+            PieceColor currentPieceColor = currentSquarePiece.getColor();
 
             if (hasSelection() && getSelectedPieceColor() == currentPieceColor) {
                 selectedRow = clickedRow;
                 selectedCol = clickedCol;
             } else if (hasSelection()) {
-                if (moveValidator.isMoveLegal(selectedRow, selectedCol, clickedRow, clickedCol)) {
+                if (ruleEngine.isMoveLegal(selectedRow, selectedCol, clickedRow, clickedCol)) {
                     executeMove(selectedRow, selectedCol, clickedRow, clickedCol);
                 } else {
                     clearSelection();
@@ -69,7 +74,7 @@ public class GameEngine {
             }
         } else {
             if (hasSelection()) {
-                if (moveValidator.isMoveLegal(selectedRow, selectedCol, clickedRow, clickedCol)) {
+                if (ruleEngine.isMoveLegal(selectedRow, selectedCol, clickedRow, clickedCol)) {
                     executeMove(selectedRow, selectedCol, clickedRow, clickedCol);
                 } else {
                     clearSelection();
@@ -86,11 +91,11 @@ public class GameEngine {
             return;
         }
 
-        Piece currentPiece = board.getPieceAt(clickedRow, clickedCol);
+        Piece currentPiece = board.getPieceAt(new Position(clickedRow, clickedCol));
         if (currentPiece != null) {
             if (canPieceJump(clickedRow, clickedCol)) {
                 pendingJumps.add(new PendingJump(clickedRow, clickedCol, currentPiece, gameClock));
-                board.setPieceAt(clickedRow, clickedCol, null);
+                board.setPieceAt(new Position(clickedRow, clickedCol), null);
             }
         }
         clearSelection();
@@ -107,7 +112,7 @@ public class GameEngine {
     }
 
     public void executeMove(int fromRow, int fromCol, int toRow, int toCol) {
-        Piece piece = board.getPieceAt(fromRow, fromCol);
+        Piece piece = board.getPieceAt(new Position(fromRow, fromCol));
         long arrivalTime = gameClock + 1000L;
         pendingMoves.add(new PendingMove(fromRow, fromCol, toRow, toCol, piece, arrivalTime));
         clearSelection();
@@ -117,8 +122,8 @@ public class GameEngine {
         return selectedRow != -1 && selectedCol != -1;
     }
 
-    private char getSelectedPieceColor() {
-        return board.getPieceAt(selectedRow, selectedCol).getColor();
+    private PieceColor getSelectedPieceColor() {
+        return board.getPieceAt(new Position(selectedRow, selectedCol)).getColor();
     }
 
     private void clearSelection() {

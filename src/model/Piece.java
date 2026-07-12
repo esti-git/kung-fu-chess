@@ -26,4 +26,7 @@ public abstract class Piece {
     public void setCell(Position cell) { this.cell = cell; }
     public PieceState getState() { return state; }
     public void setState(PieceState state) { this.state = state; }
+
+    public abstract String getRepresentation();
+    public abstract boolean isMovementPatternLegal(int fromRow, int fromCol, int toRow, int toCol, int totalRows);
 }

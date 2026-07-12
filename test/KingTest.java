@@ -1,20 +1,25 @@
-import interfaces.Piece;
+import enums.PieceColor;
+import model.Piece;
 import org.junit.jupiter.api.Test;
-import pieces.King;
+import rules.pieces.King;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class KingTest {
 
     @Test
-    void testKingMovementPattern() {
-        Piece king = new King('w');
-
-        // צעד אחד לכל כיוון (כולל אלכסון) - חוקי
+    void testOneStepMoveIsLegal() {
+        Piece king = new King(1, PieceColor.WHITE);
         assertTrue(king.isMovementPatternLegal(4, 4, 5, 5, 8));
         assertTrue(king.isMovementPatternLegal(4, 4, 4, 3, 8));
+        assertTrue(king.isMovementPatternLegal(4, 4, 3, 4, 8));
+    }
 
-        // מעבר לצעד אחד (למשל 2 משבצות ימינה) - אסור
+    @Test
+    void testMoreThanOneStepIsIllegal() {
+        Piece king = new King(1, PieceColor.WHITE);
         assertFalse(king.isMovementPatternLegal(4, 4, 4, 6, 8));
+        assertFalse(king.isMovementPatternLegal(4, 4, 2, 4, 8));
+        assertFalse(king.isMovementPatternLegal(4, 4, 6, 6, 8));
     }
 }

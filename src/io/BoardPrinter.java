@@ -1,7 +1,8 @@
 package io;
 
-import interfaces.Board;
-import interfaces.Piece;
+import model.Board;
+import model.Piece;
+import model.Position;
 
 public class BoardPrinter {
 
@@ -15,7 +16,7 @@ public class BoardPrinter {
         for (int i = 0; i < board.getRows(); i++) {
             StringBuilder rowStr = new StringBuilder();
             for (int j = 0; j < board.getCols(); j++) {
-                Piece piece = board.getPieceAt(i, j);
+                Piece piece = board.getPieceAt(new Position(i, j));
                 rowStr.append(piece == null ? "." : piece.getRepresentation());
                 if (j < board.getCols() - 1) rowStr.append(" ");
             }

@@ -1,6 +1,6 @@
 package model;
 
-import interfaces.Piece;
+import model.Piece;
 
 public class PendingMove {
     private int fromRow, fromCol;

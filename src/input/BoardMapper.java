@@ -2,7 +2,7 @@ package input;
 
 import board.MatrixBoard;
 import io.BoardParser;
-import model.PieceModel;
+import model.Piece;
 
 import java.util.List;
 
@@ -16,7 +16,7 @@ public class BoardMapper {
     }
 
     public boolean map(List<String> rawBoardLines) {
-        List<PieceModel> pieces = parser.parse(rawBoardLines);
+        List<Piece> pieces = parser.parse(rawBoardLines);
         if (pieces == null) return false;
         board.initialize(pieces, parser.parseRows(rawBoardLines), parser.parseCols(rawBoardLines));
         return true;

@@ -4,6 +4,7 @@ import model.Board;
 import model.Piece;
 import model.PendingJump;
 import model.PendingMove;
+import model.Position;
 
 import java.util.List;
 
@@ -26,7 +27,7 @@ public class RuleEngine {
             if (jump.getRow() == fromRow && jump.getCol() == fromCol) return false;
         }
 
-        Piece movingPiece = board.getPieceAt(fromRow, fromCol);
+        Piece movingPiece = board.getPieceAt(new Position(fromRow, fromCol));
         enums.PieceColor movingColor = movingPiece.getColor();
 
         for (PendingJump jump : pendingJumps) {
@@ -47,7 +48,7 @@ public class RuleEngine {
             if (move.getToRow() == toRow && move.getToCol() == toCol) return false;
         }
 
-        Piece destinationPiece = board.getPieceAt(toRow, toCol);
+        Piece destinationPiece = board.getPieceAt(new Position(toRow, toCol));
 
         if (destinationPiece != null) {
             if (movingColor == destinationPiece.getColor()) return false;
@@ -69,11 +70,11 @@ public class RuleEngine {
 
             if (deltaCol == 0) {
                 if (actualRowDirection == expectedRowDirection) {
-                    return board.isEmpty(toRow, toCol);
+                    return board.isEmpty(new Position(toRow, toCol));
                 }
                 if (actualRowDirection == expectedRowDirection * 2) {
                     int middleRow = fromRow + expectedRowDirection;
-                    if (!board.isEmpty(middleRow, fromCol) || !board.isEmpty(toRow, toCol)) {
+                    if (!board.isEmpty(new Position(middleRow, fromCol)) || !board.isEmpty(new Position(toRow, toCol))) {
                         return false;
                     }
                     for (PendingMove move : pendingMoves) {
@@ -101,7 +102,7 @@ public class RuleEngine {
         int currentCol = fromCol + stepCol;
 
         while (currentRow != toRow || currentCol != toCol) {
-            if (!board.isEmpty(currentRow, currentCol)) return false;
+            if (!board.isEmpty(new Position(currentRow, currentCol))) return false;
 
             for (PendingMove move : pendingMoves) {
                 if (move.getToRow() == currentRow && move.getToCol() == currentCol) return false;

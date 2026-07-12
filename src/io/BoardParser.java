@@ -2,15 +2,21 @@ package io;
 
 import enums.PieceColor;
 import enums.PieceKind;
-import model.PieceModel;
+import model.Piece;
 import model.Position;
+import rules.pieces.Bishop;
+import rules.pieces.King;
+import rules.pieces.Knight;
+import rules.pieces.Pawn;
+import rules.pieces.Queen;
+import rules.pieces.Rook;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class BoardParser {
 
-    public List<PieceModel> parse(List<String> rawBoardLines) {
+    public List<Piece> parse(List<String> rawBoardLines) {
         if (rawBoardLines.isEmpty()) return null;
 
         int expectedColumns = rawBoardLines.get(0).split(" +").length;
@@ -30,7 +36,7 @@ public class BoardParser {
             }
         }
 
-        List<PieceModel> pieces = new ArrayList<>();
+        List<Piece> pieces = new ArrayList<>();
         for (int row = 0; row < rawBoardLines.size(); row++) {
             String[] tokens = rawBoardLines.get(row).split(" +");
             for (int col = 0; col < tokens.length; col++) {
@@ -38,7 +44,7 @@ public class BoardParser {
                 if (!token.equals(".")) {
                     PieceColor color = token.charAt(0) == 'w' ? PieceColor.WHITE : PieceColor.BLACK;
                     PieceKind kind = charToKind(token.charAt(1));
-                    pieces.add(new PieceModel(idCounter++, color, kind, new Position(row, col)));
+                    pieces.add(createPiece(idCounter++, color, kind, new Position(row, col)));
                 }
             }
         }
@@ -57,6 +63,21 @@ public class BoardParser {
         return token.length() == 2
                 && (token.charAt(0) == 'w' || token.charAt(0) == 'b')
                 && "RNBQKP".indexOf(token.charAt(1)) >= 0;
+    }
+
+    private Piece createPiece(int id, PieceColor color, PieceKind kind, Position cell) {
+        Piece piece;
+        switch (kind) {
+            case KING:   piece = new King(id, color); break;
+            case QUEEN:  piece = new Queen(id, color); break;
+            case ROOK:   piece = new Rook(id, color); break;
+            case BISHOP: piece = new Bishop(id, color); break;
+            case KNIGHT: piece = new Knight(id, color); break;
+            case PAWN:   piece = new Pawn(id, color); break;
+            default:     return null;
+        }
+        piece.setCell(cell);
+        return piece;
     }
 
     private PieceKind charToKind(char c) {

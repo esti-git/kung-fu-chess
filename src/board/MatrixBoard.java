@@ -2,6 +2,7 @@ package board;
 
 import model.Board;
 import model.Piece;
+import model.Position;
 
 import java.util.List;
 
@@ -23,20 +24,25 @@ public class MatrixBoard implements Board {
     }
 
     @Override
-    public Piece getPieceAt(int r, int c) {
-        if (r < 0 || r >= rows || c < 0 || c >= cols) return null;
-        return matrix[r][c];
+    public Piece getPieceAt(Position pos) {
+        if (pos == null || pos.getRow() < 0 || pos.getRow() >= rows || pos.getCol() < 0 || pos.getCol() >= cols) return null;
+        return matrix[pos.getRow()][pos.getCol()];
     }
 
     @Override
-    public void setPieceAt(int r, int c, Piece piece) {
-        if (r >= 0 && r < rows && c >= 0 && c < cols) {
-            matrix[r][c] = piece;
+    public void setPieceAt(Position pos, Piece piece) {
+        if (pos != null && pos.getRow() >= 0 && pos.getRow() < rows && pos.getCol() >= 0 && pos.getCol() < cols) {
+            matrix[pos.getRow()][pos.getCol()] = piece;
         }
     }
 
     @Override
-    public boolean isEmpty(int r, int c) {
-        return getPieceAt(r, c) == null;
+    public boolean isEmpty(Position pos) {
+        return getPieceAt(pos) == null;
+    }
+
+    @Override
+    public boolean isValidPosition(Position pos) {
+        return pos != null && pos.getRow() >= 0 && pos.getRow() < rows && pos.getCol() >= 0 && pos.getCol() < cols;
     }
 }
