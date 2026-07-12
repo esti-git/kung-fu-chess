@@ -113,7 +113,8 @@ public class GameEngine {
 
     public void executeMove(int fromRow, int fromCol, int toRow, int toCol) {
         Piece piece = board.getPieceAt(new Position(fromRow, fromCol));
-        long arrivalTime = gameClock + 1000L;
+        int distance = Math.max(Math.abs(toRow - fromRow), Math.abs(toCol - fromCol));
+        long arrivalTime = gameClock + distance * 1000L;
         pendingMoves.add(new PendingMove(fromRow, fromCol, toRow, toCol, piece, arrivalTime));
         clearSelection();
     }
