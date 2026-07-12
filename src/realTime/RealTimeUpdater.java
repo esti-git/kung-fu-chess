@@ -46,7 +46,7 @@ public class RealTimeUpdater {
 
             Piece currentPieceOnSrc = board.getPieceAt(fromPos);
             if (currentPieceOnSrc == null || currentPieceOnSrc.getId() != move.getPiece().getId()) {
-                continue; 
+                continue;
             }
 
             board.setPieceAt(fromPos, null);
@@ -64,16 +64,16 @@ public class RealTimeUpdater {
             }
 
             if (capturedByAirborne) {
-                if (move.getPiece().getKind() == PieceKind.KING) engine.setGameOver(true);
+                if (move.getPiece().getKind() == PieceKind.KING)
+                    engine.setGameOver(true);
                 continue;
             }
 
             Piece target = board.getPieceAt(toPos);
             if (target != null) {
-                if (target.getKind() == PieceKind.KING) engine.setGameOver(true);
+                if (target.getKind() == PieceKind.KING)
+                    engine.setGameOver(true);
                 if (target.getColor() == move.getPiece().getColor()) {
-                    // אם מדובר בכלי מאותו צבע (לא אמור לקרות אם הבדיקה המוקדמת חסמה, אך ליתר ביטחון)
-                    // מחזירים את הכלי למקור שלו כדי שלא ייעלם
                     board.setPieceAt(fromPos, move.getPiece());
                     continue;
                 }

@@ -31,18 +31,15 @@ public class GameEngine {
     public List<PendingMove> getPendingMoves() { return state.getPendingMoves(); }
     public List<PendingJump> getPendingJumps() { return state.getPendingJumps(); }
 
-    public void handleClick(int x, int y) {
-        int clickedCol = x / GameConfig.CELL_SIZE;
-        int clickedRow = y / GameConfig.CELL_SIZE;
+    public void handleClick(int row, int col) {
+        if (!state.getBoard().isValidPosition(new Position(row, col))) return;
 
-        if (!state.getBoard().isValidPosition(new Position(clickedRow, clickedCol))) return;
-
-        Piece currentSquarePiece = state.getBoard().getPieceAt(new Position(clickedRow, clickedCol));
-        Position clickedPos = new Position(clickedRow, clickedCol);
+        Piece currentSquarePiece = state.getBoard().getPieceAt(new Position(row, col));
+        Position clickedPos = new Position(row, col);
 
         if (hasSelection() && state.getSelectedPosition().equals(clickedPos)) {
-            if (canPieceJump(clickedRow, clickedCol)) {
-                state.getPendingJumps().add(new PendingJump(clickedRow, clickedCol, currentSquarePiece, state.getGameClock()));
+            if (canPieceJump(row, col)) {
+                state.getPendingJumps().add(new PendingJump(row, col, currentSquarePiece, state.getGameClock()));
                 state.getBoard().setPieceAt(clickedPos, null);
             }
             clearSelection();
@@ -56,8 +53,8 @@ public class GameEngine {
                 state.setSelectedPosition(clickedPos);
             } else if (hasSelection()) {
                 Position sel = state.getSelectedPosition();
-                if (ruleEngine.isMoveLegal(sel.getRow(), sel.getCol(), clickedRow, clickedCol)) {
-                    executeMove(sel.getRow(), sel.getCol(), clickedRow, clickedCol);
+                if (ruleEngine.isMoveLegal(sel.getRow(), sel.getCol(), row, col)) {
+                    executeMove(sel.getRow(), sel.getCol(), row, col);
                 } else {
                     clearSelection();
                 }
@@ -67,8 +64,8 @@ public class GameEngine {
         } else {
             if (hasSelection()) {
                 Position sel = state.getSelectedPosition();
-                if (ruleEngine.isMoveLegal(sel.getRow(), sel.getCol(), clickedRow, clickedCol)) {
-                    executeMove(sel.getRow(), sel.getCol(), clickedRow, clickedCol);
+                if (ruleEngine.isMoveLegal(sel.getRow(), sel.getCol(), row, col)) {
+                    executeMove(sel.getRow(), sel.getCol(), row, col);
                 } else {
                     clearSelection();
                 }
@@ -76,18 +73,21 @@ public class GameEngine {
         }
     }
 
-    public void handleJumpCommand(int x, int y) {
-        int clickedCol = x / GameConfig.CELL_SIZE;
-        int clickedRow = y / GameConfig.CELL_SIZE;
+    public void handleJumpCommand(int row, int col) {
+        if (!state.getBoard().isValidPosition(new Position(row, col))) return;
 
-        if (!state.getBoard().isValidPosition(new Position(clickedRow, clickedCol))) return;
-
-        Piece currentPiece = state.getBoard().getPieceAt(new Position(clickedRow, clickedCol));
-        if (currentPiece != null && canPieceJump(clickedRow, clickedCol)) {
-            state.getPendingJumps().add(new PendingJump(clickedRow, clickedCol, currentPiece, state.getGameClock()));
-            state.getBoard().setPieceAt(new Position(clickedRow, clickedCol), null);
+        Piece currentPiece = state.getBoard().getPieceAt(new Position(row, col));
+        if (currentPiece != null && canPieceJump(row, col)) {
+            state.getPendingJumps().add(new PendingJump(row, col, currentPiece, state.getGameClock()));
+            state.getBoard().setPieceAt(new Position(row, col), null);
         }
         clearSelection();
+    }
+
+    public boolean canExecuteCommand(String commandType) {
+        if (!isGameOver()) return true;
+        
+        return !commandType.equals("click") && !commandType.equals("wait") && !commandType.equals("jump");
     }
 
     public boolean canPieceJump(int r, int c) {

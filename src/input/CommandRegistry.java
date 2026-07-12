@@ -1,5 +1,6 @@
 package input;
 
+import config.GameConfig;
 import engine.GameEngine;
 import io.BoardPrinter;
 import realTime.RealTimeUpdater;
@@ -28,13 +29,25 @@ public class CommandRegistry {
     private void handleClick(String[] parts) {
         int x = Integer.parseInt(parts[1]);
         int y = Integer.parseInt(parts[2]);
-        engine.handleClick(x, y);
+        int row = convertPixelToRow(y);
+        int col = convertPixelToCol(x);
+        engine.handleClick(row, col);
     }
 
     private void handleJump(String[] parts) {
         int jx = Integer.parseInt(parts[1]);
         int jy = Integer.parseInt(parts[2]);
-        engine.handleJumpCommand(jx, jy);
+        int row = convertPixelToRow(jy);
+        int col = convertPixelToCol(jx);
+        engine.handleJumpCommand(row, col);
+    }
+
+    private int convertPixelToRow(int pixelY) {
+        return pixelY / GameConfig.CELL_SIZE;
+    }
+
+    private int convertPixelToCol(int pixelX) {
+        return pixelX / GameConfig.CELL_SIZE;
     }
 
     private void handleWait(String[] parts) {

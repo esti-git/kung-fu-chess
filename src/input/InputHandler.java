@@ -4,29 +4,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
-import board.MatrixBoard;
-import engine.GameEngine;
-import io.BoardPrinter;
-import model.GameState;
-import realTime.RealTimeUpdater;
-
 public class InputHandler {
 
-    private final MatrixBoard board = new MatrixBoard();
+    private final GameFactory factory;
     private final BoardMapper boardMapper;
     private final Controller controller;
 
     public InputHandler() {
-        GameState state = new GameState();
-        state.setBoard(board);
-        GameEngine engine = new GameEngine(state);
-        RealTimeUpdater updater = new RealTimeUpdater(engine);
-        BoardPrinter printer = new BoardPrinter(board);
-        
-        this.boardMapper = new BoardMapper(board);
-        
-        CommandRegistry registry = new CommandRegistry(engine, updater, printer);
-        this.controller = new Controller(engine, registry);
+        this.factory = new GameFactory();
+        this.boardMapper = factory.getBoardMapper();
+        this.controller = factory.getController();
     }
 
     public void run() {

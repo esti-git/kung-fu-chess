@@ -18,7 +18,7 @@ public class Controller {
         
         String commandType = parts[0];
 
-        if (engine.isGameOver() && (commandType.equals("click") || commandType.equals("wait") || commandType.equals("jump"))) {
+        if (!engine.canExecuteCommand(commandType)) {
             return;
         }
 
