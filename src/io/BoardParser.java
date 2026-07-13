@@ -13,7 +13,7 @@ public class BoardParser {
     public List<Piece> parse(List<String> rawBoardLines) {
         if (rawBoardLines.isEmpty()) return null;
 
-        int expectedColumns = rawBoardLines.get(0).split(" +").length;
+        int expectedColumns = parseCols(rawBoardLines);
         int idCounter = 0;
 
         for (String line : rawBoardLines) {

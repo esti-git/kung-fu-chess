@@ -1,5 +1,6 @@
 package rules;
 
+import engine.GameResult;
 import model.Board;
 import model.Piece;
 import model.PendingJump;
@@ -10,49 +11,62 @@ import java.util.List;
 
 public class RuleEngine {
 
-    private final Board board;
-    private final List<PendingMove> pendingMoves;
-    private final List<PendingJump> pendingJumps;
+    public GameResult<Void> validateMove(
+            Board board,
+            Position source,
+            Position destination,
+            List<PendingMove> pendingMoves,
+            List<PendingJump> pendingJumps
+    ) {
+        int fromRow = source.getRow();
+        int fromCol = source.getCol();
+        int toRow = destination.getRow();
+        int toCol = destination.getCol();
 
-    public RuleEngine(Board board, List<PendingMove> pendingMoves, List<PendingJump> pendingJumps) {
-        this.board = board;
-        this.pendingMoves = pendingMoves;
-        this.pendingJumps = pendingJumps;
-    }
+        if (fromRow == toRow && fromCol == toCol) {
+            return GameResult.fail("Move must change position");
+        }
 
-    public boolean isMoveLegal(int fromRow, int fromCol, int toRow, int toCol) {
-        if (fromRow == toRow && fromCol == toCol) return false;
+        Piece movingPiece = board.getPieceAt(source);
+        if (movingPiece == null) {
+            return GameResult.fail("No piece selected");
+        }
 
-        Piece movingPiece = board.getPieceAt(new Position(fromRow, fromCol));
-        if (movingPiece == null) return false;
         enums.PieceColor movingColor = movingPiece.getColor();
 
         for (PendingJump jump : pendingJumps) {
-            if (jump.getRow() == fromRow && jump.getCol() == fromCol) return false;
-            if (jump.getRow() == toRow && jump.getCol() == toCol) {
-                if (jump.getPiece().getColor() == movingColor) return false;
+            if (jump.getRow() == fromRow && jump.getCol() == fromCol) {
+                return GameResult.fail("Piece is already busy with a jump");
+            }
+            if (jump.getRow() == toRow && jump.getCol() == toCol && jump.getPiece().getColor() == movingColor) {
+                return GameResult.fail("Destination is blocked by a friendly jump");
             }
         }
 
         for (PendingMove move : pendingMoves) {
-            if (move.getFromRow() == fromRow && move.getFromCol() == fromCol) return false;
-            if (move.getToRow() == toRow && move.getToCol() == toCol
-                    && move.getPiece().getColor() == movingColor) return false;
+            if (move.getFromRow() == fromRow && move.getFromCol() == fromCol) {
+                return GameResult.fail("Piece is already moving");
+            }
+            if (move.getToRow() == toRow && move.getToCol() == toCol && move.getPiece().getColor() == movingColor) {
+                return GameResult.fail("Destination is already occupied by a friendly pending move");
+            }
         }
 
-        Piece destinationPiece = board.getPieceAt(new Position(toRow, toCol));
-
-        if (destinationPiece != null) {
-            if (movingColor == destinationPiece.getColor()) return false;
+        Piece destinationPiece = board.getPieceAt(destination);
+        if (destinationPiece != null && movingColor == destinationPiece.getColor()) {
+            return GameResult.fail("Destination is occupied by a friendly piece");
         }
 
         if (!movingPiece.isMovementPatternLegal(fromRow, fromCol, toRow, toCol, board.getRows())) {
-            return false;
+            return GameResult.fail("Movement pattern is illegal");
         }
 
         enums.PieceKind pieceKind = movingPiece.getKind();
         if (pieceKind == enums.PieceKind.ROOK || pieceKind == enums.PieceKind.BISHOP || pieceKind == enums.PieceKind.QUEEN) {
-            return isPathClear(fromRow, fromCol, toRow, toCol);
+            if (!isPathClear(board, fromRow, fromCol, toRow, toCol, pendingMoves)) {
+                return GameResult.fail("Path is blocked");
+            }
+            return GameResult.success();
         }
 
         if (pieceKind == enums.PieceKind.PAWN) {
@@ -62,38 +76,45 @@ public class RuleEngine {
 
             if (deltaCol == 0) {
                 if (actualRowDirection == expectedRowDirection) {
-                    return board.isEmpty(new Position(toRow, toCol));
+                    if (!board.isEmpty(destination)) {
+                        return GameResult.fail("Forward move is blocked");
+                    }
+                    return GameResult.success();
                 }
                 if (actualRowDirection == expectedRowDirection * 2) {
                     int startRow = (movingColor == enums.PieceColor.WHITE) ? (board.getRows() - 2) : 1;
-                    if (fromRow != startRow) return false;
-                    int middleRow = fromRow + expectedRowDirection;
-                    
-                    if (!board.isEmpty(new Position(middleRow, fromCol)) || !board.isEmpty(new Position(toRow, toCol))) {
-                        return false;
+                    if (fromRow != startRow) {
+                        return GameResult.fail("Pawn can only move two steps from its starting row");
                     }
-                    
+                    int middleRow = fromRow + expectedRowDirection;
+                    if (!board.isEmpty(new Position(middleRow, fromCol)) || !board.isEmpty(destination)) {
+                        return GameResult.fail("Pawn double-step path is blocked");
+                    }
+
                     for (PendingMove move : pendingMoves) {
                         if (move.getPiece().getId() == movingPiece.getId()) {
                             continue;
                         }
                         if ((move.getToRow() == middleRow && move.getToCol() == fromCol) ||
                                 (move.getToRow() == toRow && move.getToCol() == toCol)) {
-                            return false;
+                            return GameResult.fail("Pawn double-step path is blocked by a pending move");
                         }
                     }
-                    return true;
+                    return GameResult.success();
                 }
             }
             if (deltaCol == 1) {
-                return destinationPiece != null;
+                if (destinationPiece != null) {
+                    return GameResult.success();
+                }
+                return GameResult.fail("Pawn capture requires a target piece");
             }
         }
 
-        return true;
+        return GameResult.success();
     }
 
-    private boolean isPathClear(int fromRow, int fromCol, int toRow, int toCol) {
+    private boolean isPathClear(Board board, int fromRow, int fromCol, int toRow, int toCol, List<PendingMove> pendingMoves) {
         int stepRow = Integer.compare(toRow, fromRow);
         int stepCol = Integer.compare(toCol, fromCol);
 

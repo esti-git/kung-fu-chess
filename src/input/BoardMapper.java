@@ -1,24 +1,24 @@
 package input;
 
-import board.MatrixBoard;
-import io.BoardParser;
-import model.Piece;
+import config.GameConfig;
+import model.Board;
+import model.Position;
 
-import java.util.List;
+import java.util.Optional;
 
 public class BoardMapper {
 
-    private final MatrixBoard board;
-    private final BoardParser parser = new BoardParser();
+    private final Board board;
 
-    public BoardMapper(MatrixBoard board) {
+    public BoardMapper(Board board) {
         this.board = board;
     }
 
-    public boolean map(List<String> rawBoardLines) {
-        List<Piece> pieces = parser.parse(rawBoardLines);
-        if (pieces == null) return false;
-        board.initialize(pieces, parser.parseRows(rawBoardLines), parser.parseCols(rawBoardLines));
-        return true;
+    public Optional<Position> pixelToCell(int x, int y) {
+        Position position = new Position(y / GameConfig.CELL_SIZE, x / GameConfig.CELL_SIZE);
+        if (board.isValidPosition(position)) {
+            return Optional.of(position);
+        }
+        return Optional.empty();
     }
 }

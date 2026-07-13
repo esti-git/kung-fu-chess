@@ -3,7 +3,6 @@ package board;
 import model.Board;
 import model.Piece;
 import model.Position;
-
 import java.util.List;
 
 public class MatrixBoard implements Board {
@@ -19,21 +18,59 @@ public class MatrixBoard implements Board {
         this.cols = cols;
         this.matrix = new Piece[rows][cols];
         for (Piece piece : pieces) {
-            matrix[piece.getCell().getRow()][piece.getCell().getCol()] = piece;
+            addPiece(piece.getCell(), piece);
         }
     }
 
     @Override
     public Piece getPieceAt(Position pos) {
-        if (!isValidPosition(pos)) return null;
+        requireValid(pos);
         return matrix[pos.getRow()][pos.getCol()];
     }
 
     @Override
     public void setPieceAt(Position pos, Piece piece) {
-        if (isValidPosition(pos)) {
-            matrix[pos.getRow()][pos.getCol()] = piece;
+        requireValid(pos);
+        matrix[pos.getRow()][pos.getCol()] = piece;
+        if (piece != null) {
+            piece.setCell(pos);
         }
+    }
+
+    @Override
+    public void addPiece(Position pos, Piece piece) {
+        requireValid(pos);
+        if (matrix[pos.getRow()][pos.getCol()] != null) {
+            throw new IllegalStateException("Cell already occupied at: " + pos);
+        }
+        matrix[pos.getRow()][pos.getCol()] = piece;
+        if (piece != null) {
+            piece.setCell(pos);
+        }
+    }
+
+    @Override
+    public void movePiece(Position source, Position destination) {
+        requireValid(source);
+        requireValid(destination);
+        Piece movingPiece = getPieceAt(source);
+        if (movingPiece == null) {
+            throw new IllegalStateException("Empty source at: " + source);
+        }
+        matrix[source.getRow()][source.getCol()] = null;
+        matrix[destination.getRow()][destination.getCol()] = movingPiece;
+        movingPiece.setCell(destination);
+    }
+
+    @Override
+    public Piece removePiece(Position pos) {
+        requireValid(pos);
+        Piece removed = getPieceAt(pos);
+        matrix[pos.getRow()][pos.getCol()] = null;
+        if (removed != null) {
+            removed.setState(enums.PieceState.CAPTURED);
+        }
+        return removed;
     }
 
     @Override
@@ -44,5 +81,11 @@ public class MatrixBoard implements Board {
     @Override
     public boolean isValidPosition(Position pos) {
         return pos != null && pos.getRow() >= 0 && pos.getRow() < rows && pos.getCol() >= 0 && pos.getCol() < cols;
+    }
+
+    private void requireValid(Position pos) {
+        if (!isValidPosition(pos)) {
+            throw new IllegalArgumentException("Outside board bounds: " + pos);
+        }
     }
 }

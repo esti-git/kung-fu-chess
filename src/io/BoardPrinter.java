@@ -12,6 +12,17 @@ public class BoardPrinter {
         this.board = board;
     }
 
+    public void handleRawPrint(String[] parts) {
+        if (parts == null || parts.length <= 1) {
+            print();
+            return;
+        }
+
+        if ("board".equals(parts[1])) {
+            print();
+        }
+    }
+
     public void print() {
         for (int i = 0; i < board.getRows(); i++) {
             StringBuilder rowStr = new StringBuilder();
