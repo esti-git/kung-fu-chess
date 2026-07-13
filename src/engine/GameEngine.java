@@ -116,22 +116,23 @@ public class GameEngine {
         return GameResult.success();
     }
 
-    public GameResult<Void> requestJump(Position pos) {
-        if (state.isGameOver()) return GameResult.fail("Game is over");
-        if (pos == null || !state.getBoard().isValidPosition(pos)) return GameResult.fail("Invalid jump position");
+public GameResult<Void> requestJump(Position pos) {
+    if (state.isGameOver()) return GameResult.fail("Game is over");
+    if (pos == null || !state.getBoard().isValidPosition(pos)) return GameResult.fail("Invalid jump position");
 
-        Piece currentPiece = state.getBoard().getPieceAt(pos);
-        if (currentPiece == null) return GameResult.fail("No piece at jump position");
-        if (!canPieceJump(pos.getRow(), pos.getCol())) return GameResult.fail("Jump is not currently possible");
+    Piece currentPiece = state.getBoard().getPieceAt(pos);
+    if (currentPiece == null) return GameResult.fail("No piece at jump position");
+    if (!canPieceJump(pos.getRow(), pos.getCol())) return GameResult.fail("Jump is not currently possible");
 
-        if (arbiter != null) {
-            arbiter.startJump(currentPiece, pos);
-        } else {
-            getPendingJumps().add(new PendingJump(pos.getRow(), pos.getCol(), currentPiece, getGameClock()));
-        }
-        state.getBoard().setPieceAt(pos, null);
-        return GameResult.success();
+    if (arbiter != null) {
+        arbiter.startJump(currentPiece, pos);
+    } else {
+        getPendingJumps().add(new PendingJump(pos.getRow(), pos.getCol(), currentPiece, getGameClock()));
     }
+    
+    state.getBoard().clearCellOnly(pos); 
+    return GameResult.success();
+}
 
     public boolean canExecuteCommand(String commandType) {
         if (!isGameOver()) return true;

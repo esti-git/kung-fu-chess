@@ -29,15 +29,6 @@ public class MatrixBoard implements Board {
     }
 
     @Override
-    public void setPieceAt(Position pos, Piece piece) {
-        requireValid(pos);
-        matrix[pos.getRow()][pos.getCol()] = piece;
-        if (piece != null) {
-            piece.setCell(pos);
-        }
-    }
-
-    @Override
     public void addPiece(Position pos, Piece piece) {
         requireValid(pos);
         if (matrix[pos.getRow()][pos.getCol()] != null) {
@@ -48,6 +39,12 @@ public class MatrixBoard implements Board {
             piece.setCell(pos);
         }
     }
+
+    @Override
+public void clearCellOnly(Position position) {
+    requireValid(position);
+    matrix[position.getRow()][position.getCol()] = null;
+}
 
     @Override
     public void movePiece(Position source, Position destination) {

@@ -59,7 +59,7 @@ public class RealTimeArbiter {
         piece.setState(PieceState.MOVING);
         
         if (board.getPieceAt(position) == piece) {
-            board.setPieceAt(position, null);
+            board.clearCellOnly(position);
         }
     }
 
@@ -116,25 +116,24 @@ public class RealTimeArbiter {
         Position destination = new Position(move.getToRow(), move.getToCol());
 
         if (board.getPieceAt(source) == movingPiece) {
-            board.setPieceAt(source, null);
+            board.clearCellOnly(source);
         }
 
         Piece target = board.getPieceAt(destination);
         if (target != null && target.getColor() == movingPiece.getColor()) {
             movingPiece.setState(PieceState.IDLE);
-            board.setPieceAt(source, movingPiece);
+            board.addPiece(source, movingPiece);
             return false;
         }
 
         boolean kingCaptured = false;
         if (target != null) {
-            target.setState(PieceState.CAPTURED);
+            board.removePiece(destination);
             if (target.getKind() == PieceKind.KING) kingCaptured = true;
         }
 
         Piece promotedPiece = PawnPromotion.applyPromotion(movingPiece, destination.getRow(), board.getRows());
-        board.setPieceAt(destination, promotedPiece);
-        promotedPiece.setCell(destination);
+        board.addPiece(destination, promotedPiece);
         promotedPiece.setState(PieceState.IDLE);
 
         return kingCaptured;
@@ -148,20 +147,26 @@ public class RealTimeArbiter {
         Piece existingPiece = board.getPieceAt(jumpPosition);
 
         boolean kingCaptured = false;
+
         if (existingPiece == null) {
-            board.setPieceAt(jumpPosition, piece);
-            piece.setCell(jumpPosition);
+            board.addPiece(jumpPosition, piece);
             piece.setState(PieceState.IDLE);
         } else if (existingPiece.getColor() != piece.getColor()) {
-            existingPiece.setState(PieceState.CAPTURED);
+            board.removePiece(jumpPosition); 
             if (existingPiece.getKind() == PieceKind.KING) kingCaptured = true;
             
-            board.setPieceAt(jumpPosition, piece);
-            piece.setCell(jumpPosition);
+            board.addPiece(jumpPosition, piece);
             piece.setState(PieceState.IDLE);
         } else {
-            board.setPieceAt(jumpPosition, piece);
-            piece.setCell(jumpPosition);
+            Position originalPos = piece.getCell();
+            if (originalPos != null && board.getPieceAt(originalPos) == null) {
+                board.addPiece(originalPos, piece);
+            } else {
+                Position backup = new Position(jump.getRow(), jump.getCol());
+                if (board.getPieceAt(backup) == null) {
+                    board.addPiece(backup, piece);
+                }
+            }
             piece.setState(PieceState.IDLE);
         }
         return kingCaptured;
