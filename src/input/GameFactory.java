@@ -18,18 +18,24 @@ public class GameFactory {
     private final CommandRegistry registry;
     private final Controller controller;
 
-    public GameFactory() {
-        this.board = new MatrixBoard();
-        this.state = createGameState();
-        this.engine = new GameEngine(state);
-        this.arbiter = new RealTimeArbiter(board);
-        this.engine.setArbiter(arbiter);
-        this.printer = new BoardPrinter(board);
-        this.boardParser = new BoardParser();
-        this.boardMapper = new BoardMapper(board);
-        this.controller = new Controller(engine, boardMapper);
-        this.registry = new CommandRegistry(controller, engine, printer);
-    }
+public GameFactory() {
+    this.board = new MatrixBoard();
+    this.state = createGameState();
+    this.engine = new GameEngine(state);
+    this.arbiter = new RealTimeArbiter(board);
+    this.engine.setArbiter(arbiter);
+    this.printer = new BoardPrinter(board);
+    
+    this.printer.setEngine(engine); 
+    
+    this.boardParser = new BoardParser();
+    this.boardMapper = new BoardMapper(board);
+this.controller = new Controller(engine, boardMapper, printer);
+    this.registry = new CommandRegistry(controller, engine, printer);
+    // החיבור החדש שמאפשר ללחיצות העכבר לשלוח פקודות:
+    
+    this.printer.setRegistry(this.registry);
+}
 
     private GameState createGameState() {
         return new GameState(board);
