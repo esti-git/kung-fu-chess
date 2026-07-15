@@ -9,6 +9,7 @@ import model.PendingMove;
 import model.PendingJump;
 import model.PendingRest;
 
+import java.awt.BasicStroke;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Color;
@@ -41,7 +42,7 @@ public class BoardRenderer {
         this.cellSize = GameConfig.CELL_SIZE;
     }
 
-    public Img render(List<PendingMove> pendingMoves, List<PendingJump> pendingJumps, List<PendingRest> pendingRests, long gameClock) {
+    public Img render(List<PendingMove> pendingMoves, List<PendingJump> pendingJumps, List<PendingRest> pendingRests, Position selectedPosition, long gameClock) {
         // יצירת אובייקט Img חדש
         Img canvas = new Img();
 
@@ -82,6 +83,11 @@ public class BoardRenderer {
         // ציור כלים בקפיצה
         for (PendingJump jump : pendingJumps) {
             drawJumpingPiece(canvas, jump, gameClock);
+        }
+
+        // מסגרת סביב המשבצת שנבחרה - מצוירת אחרונה כדי שתהיה תמיד גלויה מעל הכל
+        if (selectedPosition != null) {
+            drawSelectionHighlight(canvas, selectedPosition);
         }
 
         return canvas;
@@ -132,6 +138,21 @@ public class BoardRenderer {
         Graphics2D g = canvas.get().createGraphics();
         g.setColor(REST_TINT);
         g.fillRect(x, y + (cellSize - fillHeight), cellSize, fillHeight);
+        g.dispose();
+    }
+
+    private static final Color SELECTION_BORDER = new Color(255, 255, 0);
+    private static final int SELECTION_BORDER_WIDTH = 4;
+
+    private void drawSelectionHighlight(Img canvas, Position selectedPosition) {
+        int x = selectedPosition.getCol() * cellSize;
+        int y = selectedPosition.getRow() * cellSize;
+        int inset = SELECTION_BORDER_WIDTH / 2;
+
+        Graphics2D g = canvas.get().createGraphics();
+        g.setColor(SELECTION_BORDER);
+        g.setStroke(new BasicStroke(SELECTION_BORDER_WIDTH));
+        g.drawRect(x + inset, y + inset, cellSize - SELECTION_BORDER_WIDTH, cellSize - SELECTION_BORDER_WIDTH);
         g.dispose();
     }
 

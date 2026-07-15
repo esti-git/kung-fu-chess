@@ -1,20 +1,29 @@
 package io;
 
 import engine.GameEngine;
+import enums.PieceColor;
 import model.Board;
 import model.Position;
 import input.CommandRegistry;
+import input.Controller;
 
 import javax.swing.*;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
 
 public class BoardPrinter {
 
     private static final int HISTORY_PANEL_WIDTH = 160;
     private static final int HISTORY_POLL_MS = 500; // אין צורך בעדכון מיידי - גם שנייה אחרי זה בסדר
+    private static final int RESTART_DELAY_MS = 3000; // כמה זמן להציג GAME OVER לפני שמתחיל משחק חדש
 
     private final Board board;
     private final BoardRenderer renderer;
@@ -22,6 +31,8 @@ public class BoardPrinter {
     private final ScoreTracker scoreTracker;
     private GameEngine engine;
     private CommandRegistry registry;
+    private Controller controller;
+    private Runnable restartAction;
 
     private JFrame guiWindow;
     private JLabel imageLabel;
@@ -32,6 +43,7 @@ public class BoardPrinter {
     private Timer gameLoopTimer; // טיימר לניהול קצב המשחק בזמן אמת
     private Timer historyTimer; // טיימר נפרד ואיטי - "צופה מהצד" על שינויים בלוח, לא מחובר לקוד ביצוע המהלכים/התפיסות
     private long lastSystemTime; // מעקב אחר הזמן האמיתי של המחשב
+    private boolean gameOverHandled; // מונע הפעלה כפולה של טיימר ההתחלה מחדש כל עוד המשחק עדיין נגמר
 
     public BoardPrinter(Board board) {
         this.board = board;
@@ -46,6 +58,21 @@ public class BoardPrinter {
 
     public void setRegistry(CommandRegistry registry) {
         this.registry = registry;
+    }
+
+    public void setController(Controller controller) {
+        this.controller = controller;
+    }
+
+    public void setRestartAction(Runnable restartAction) {
+        this.restartAction = restartAction;
+    }
+
+    /** מאפס את תצוגות ההיסטוריה והניקוד - נקרא לאחר שמשחק חדש מתחיל */
+    public void resetTrackers() {
+        historyTracker.reset();
+        scoreTracker.reset();
+        updateHistoryPanels();
     }
 
     public void handleRawPrint(String[] parts) {
@@ -97,6 +124,7 @@ public class BoardPrinter {
                 engine.getPendingMoves(),
                 engine.getPendingJumps(),
                 engine.getPendingRests(),
+                (controller != null) ? controller.selectedPosition() : null,
                 engine.getGameClock()
             );
 
@@ -164,11 +192,43 @@ public class BoardPrinter {
                 engine.getPendingMoves(),
                 engine.getPendingJumps(),
                 engine.getPendingRests(),
+                (controller != null) ? controller.selectedPosition() : null,
                 engine.getGameClock()
             );
+            if (engine.isGameOver()) {
+                drawGameOverOverlay(visualBoard.get());
+            }
             imageLabel.setIcon(new ImageIcon(visualBoard.get()));
             guiWindow.repaint();
         });
+    }
+
+    private void drawGameOverOverlay(BufferedImage image) {
+        Graphics2D g = image.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        g.setColor(new Color(0, 0, 0, 160));
+        g.fillRect(0, 0, image.getWidth(), image.getHeight());
+        g.setColor(Color.WHITE);
+
+        String title = "GAME OVER";
+        g.setFont(g.getFont().deriveFont(Font.BOLD, 48f));
+        FontMetrics titleMetrics = g.getFontMetrics();
+        int titleX = (image.getWidth() - titleMetrics.stringWidth(title)) / 2;
+        int titleY = image.getHeight() / 2 - 10;
+        g.drawString(title, titleX, titleY);
+
+        PieceColor winner = (engine != null) ? engine.getWinnerColor() : null;
+        if (winner != null) {
+            String winnerText = (winner == PieceColor.WHITE ? "לבן" : "שחור") + " מנצח!";
+            g.setFont(g.getFont().deriveFont(Font.BOLD, 28f));
+            FontMetrics winnerMetrics = g.getFontMetrics();
+            int winnerX = (image.getWidth() - winnerMetrics.stringWidth(winnerText)) / 2;
+            int winnerY = titleY + titleMetrics.getDescent() + winnerMetrics.getAscent() + 15;
+            g.drawString(winnerText, winnerX, winnerY);
+        }
+
+        g.dispose();
     }
 
     /**
@@ -177,22 +237,44 @@ public class BoardPrinter {
      */
     private void startClockLoop() {
         lastSystemTime = System.currentTimeMillis();
-        
+
         // הרצת עדכון בכל 16 מילישניות (כ-60 FPS)
         gameLoopTimer = new Timer(16, e -> {
-            if (engine != null && !engine.isGameOver()) {
+            if (engine == null) return;
+
+            if (engine.isGameOver()) {
+                if (!gameOverHandled) {
+                    gameOverHandled = true;
+                    scheduleRestart();
+                }
+            } else {
                 long currentTime = System.currentTimeMillis();
                 long elapsed = currentTime - lastSystemTime;
                 lastSystemTime = currentTime;
 
                 // קידום השעון הפנימי של המנוע בזמן שחלף בפועל!
                 engine.advanceClock(elapsed);
-
-                // ריענון הציור על המסך כדי לראות את הכלים זזים חלקה
-                updateGUIImage();
             }
+
+            // ריענון הציור על המסך תמיד - כך שגם מסך ה-GAME OVER יישאר מוצג
+            updateGUIImage();
         });
         gameLoopTimer.start();
+    }
+
+    /**
+     * לאחר עיכוב קצר, מפעיל את פעולת ההתחלה-מחדש (אם חוברה) ומשחרר את הדגל כדי שהמחזור יוכל לקרות שוב
+     */
+    private void scheduleRestart() {
+        Timer restartTimer = new Timer(RESTART_DELAY_MS, e -> {
+            if (restartAction != null) {
+                restartAction.run();
+            }
+            lastSystemTime = System.currentTimeMillis();
+            gameOverHandled = false;
+        });
+        restartTimer.setRepeats(false);
+        restartTimer.start();
     }
 
     /**

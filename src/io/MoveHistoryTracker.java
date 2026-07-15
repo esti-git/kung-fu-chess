@@ -28,6 +28,13 @@ public class MoveHistoryTracker {
     public List<String> getWhiteMoves() { return whiteMoves; }
     public List<String> getBlackMoves() { return blackMoves; }
 
+    /** מנקה את ההיסטוריה - חובה לקרוא כשמתחילים משחק חדש, אחרת ה-id של כלים חדשים עלול להתנגש עם כלים ישנים */
+    public void reset() {
+        whiteMoves.clear();
+        blackMoves.clear();
+        lastKnownPositions.clear();
+    }
+
     public void poll() {
         for (int r = 0; r < board.getRows(); r++) {
             for (int c = 0; c < board.getCols(); c++) {

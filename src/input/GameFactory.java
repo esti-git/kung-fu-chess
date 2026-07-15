@@ -48,8 +48,10 @@ public GameFactory() {
 this.controller = new Controller(engine, boardMapper, printer);
     this.registry = new CommandRegistry(controller, engine, printer);
     // החיבור החדש שמאפשר ללחיצות העכבר לשלוח פקודות:
-    
+
     this.printer.setRegistry(this.registry);
+    this.printer.setController(this.controller);
+    this.printer.setRestartAction(this::restartGame);
 }
 
     private GameState createGameState() {
@@ -62,6 +64,16 @@ this.controller = new Controller(engine, boardMapper, printer);
     public void initializeStandardBoard() {
         List<Piece> pieces = boardParser.parse(STANDARD_BOARD);
         board.initialize(pieces, boardParser.parseRows(STANDARD_BOARD), boardParser.parseCols(STANDARD_BOARD));
+    }
+
+    /**
+     * מתחיל משחק חדש מאפס על אותו לוח - נקרא על ידי BoardPrinter כמה שניות אחרי שהוצג GAME OVER.
+     */
+    public void restartGame() {
+        initializeStandardBoard();
+        arbiter.reset();
+        engine.setGameOver(false);
+        printer.resetTrackers();
     }
 
     public MatrixBoard getBoard() { return board; }

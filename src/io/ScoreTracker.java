@@ -31,6 +31,14 @@ public class ScoreTracker {
     public int getWhiteScore() { return whiteScore; }
     public int getBlackScore() { return blackScore; }
 
+    /** מנקה את הניקוד וההיסטוריה - חובה לקרוא כשמתחילים משחק חדש, אחרת ה-id של כלים חדשים עלול להתנגש עם כלים ישנים */
+    public void reset() {
+        knownPieces.clear();
+        scoredCaptures.clear();
+        whiteScore = 0;
+        blackScore = 0;
+    }
+
     public void poll() {
         for (int r = 0; r < board.getRows(); r++) {
             for (int c = 0; c < board.getCols(); c++) {

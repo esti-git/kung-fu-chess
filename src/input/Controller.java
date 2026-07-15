@@ -61,11 +61,10 @@ public class Controller {
                 return;
             }
 
-            GameResult<Void> moveResult = engine.requestMove(selectedPosition, position);
-            if (moveResult.isSuccess()) {
-                clearSelection();
-                printer.printGUI(); // מרענן את הלוח לאחר תנועה מוצלחת
-            }
+            engine.requestMove(selectedPosition, position);
+            // בין אם המהלך הצליח ובין אם לא (למשל לחיצה על משבצת שהחייל לא יכול להגיע אליה) - מבטלים את הבחירה
+            clearSelection();
+            printer.printGUI();
         });
     }
 

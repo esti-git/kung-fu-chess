@@ -1,6 +1,7 @@
 package engine;
 
 import config.GameConfig;
+import enums.PieceColor;
 import model.GameState;
 import model.Piece;
 import model.PendingJump;
@@ -30,6 +31,10 @@ public class GameEngine {
 
     public boolean isGameOver() { return state.isGameOver(); }
     public void setGameOver(boolean value) { state.setGameOver(value); }
+
+    public PieceColor getWinnerColor() {
+        return (arbiter != null) ? arbiter.getWinnerColor() : null;
+    }
     
     public long getGameClock() {
         return (arbiter != null) ? arbiter.getCurrentTimeMillis() : 0L;

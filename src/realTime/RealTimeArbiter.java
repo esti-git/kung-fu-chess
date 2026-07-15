@@ -1,6 +1,7 @@
 package realTime;
 
 import config.GameConfig;
+import enums.PieceColor;
 import enums.PieceKind;
 import enums.PieceState;
 import model.Board;
@@ -23,6 +24,7 @@ public class RealTimeArbiter {
     private final List<PendingJump> activeJumps = new ArrayList<>();
     private final List<PendingRest> activeRests = new ArrayList<>();
     private long currentTimeMillis;
+    private PieceColor winnerColor;
 
     public RealTimeArbiter(Board board) {
         this.board = board;
@@ -42,6 +44,18 @@ public class RealTimeArbiter {
 
     public List<PendingRest> getActiveRests() {
         return activeRests;
+    }
+
+    public PieceColor getWinnerColor() {
+        return winnerColor;
+    }
+
+    /** מנקה תנועות/קפיצות/מנוחות פעילות - לשימוש כשמתחילים משחק חדש על אותו לוח */
+    public void reset() {
+        activeMoves.clear();
+        activeJumps.clear();
+        activeRests.clear();
+        winnerColor = null;
     }
 
     private void beginRest(Piece piece, PieceState restState, long durationMs) {
@@ -152,7 +166,10 @@ public class RealTimeArbiter {
                 board.clearCellOnly(destination);
             } else {
                 board.removePiece(destination);
-                if (target.getKind() == PieceKind.KING) kingCaptured = true;
+                if (target.getKind() == PieceKind.KING) {
+                    kingCaptured = true;
+                    winnerColor = movingPiece.getColor();
+                }
             }
         }
 
@@ -178,7 +195,10 @@ public class RealTimeArbiter {
             // הכלי לא הוסר מהלוח בזמן הקפיצה, אז הוא כבר נמצא במקום הנחיתה
         } else if (existingPiece.getColor() != piece.getColor()) {
             board.removePiece(jumpPosition);
-            if (existingPiece.getKind() == PieceKind.KING) kingCaptured = true;
+            if (existingPiece.getKind() == PieceKind.KING) {
+                kingCaptured = true;
+                winnerColor = piece.getColor();
+            }
 
             board.addPiece(jumpPosition, piece);
         } else {
