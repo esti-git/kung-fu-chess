@@ -7,6 +7,7 @@ import model.Piece;
 import model.Position;
 import model.PendingMove;
 import model.PendingJump;
+import model.PendingRest;
 
 import java.awt.Dimension;
 import java.awt.Graphics2D;
@@ -40,21 +41,32 @@ public class BoardRenderer {
         this.cellSize = GameConfig.CELL_SIZE;
     }
 
-    public Img render(List<PendingMove> pendingMoves, List<PendingJump> pendingJumps, long gameClock) {
+    public Img render(List<PendingMove> pendingMoves, List<PendingJump> pendingJumps, List<PendingRest> pendingRests, long gameClock) {
         // יצירת אובייקט Img חדש
-        Img canvas = new Img(); 
-        
+        Img canvas = new Img();
+
         // הגנה מפני קריסה: אם האובייקט הפנימי לא אותחל בבנאי הריק של Img, נדאג לוודא שיש לו תמונה ריקה בגודל הלוח
         ensureCanvasInitialized(canvas);
 
         // ציור הרקע (לוח המשבצות)
         drawGrid(canvas);
 
+        Map<Integer, PendingRest> restByPieceId = new HashMap<>();
+        for (PendingRest rest : pendingRests) {
+            restByPieceId.put(rest.getPiece().getId(), rest);
+        }
+
         // ציור הכלים על הלוח - כלי שנמצא באמצע תנועה/קפיצה מצויר בנפרד (למטה), לפי מיקומו המדויק/אנימציה
         for (int r = 0; r < board.getRows(); r++) {
             for (int c = 0; c < board.getCols(); c++) {
                 Piece piece = board.getPieceAt(new Position(r, c));
                 if (piece == null) continue;
+
+                PendingRest rest = restByPieceId.get(piece.getId());
+                if (rest != null) {
+                    drawRestOverlay(canvas, c * cellSize, r * cellSize, piece, rest, gameClock);
+                }
+
                 String stateFolder = stateFolderFor(piece.getState());
                 if (stateFolder != null) {
                     drawPieceAnimated(canvas, piece, c * cellSize, r * cellSize, stateFolder, gameClock);
@@ -98,6 +110,28 @@ public class BoardRenderer {
                 g.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
             }
         }
+        g.dispose();
+    }
+
+    private static final Color REST_TINT = new Color(255, 196, 0);
+
+    /**
+     * מציג את הזמן שנותר במנוחה כמלבן מלא-צבע שגובהו קטן בהדרגה (כמו מד שמתרוקן כלפי מטה),
+     * במקום לדהות את העוצמה של הצבע עצמו
+     */
+    private void drawRestOverlay(Img canvas, int x, int y, Piece piece, PendingRest rest, long gameClock) {
+        long totalDuration = (piece.getState() == PieceState.LONG_REST)
+                ? GameConfig.LONG_REST_DURATION_MS
+                : GameConfig.SHORT_REST_DURATION_MS;
+        double remainingFraction = totalDuration <= 0 ? 0.0
+                : clamp01((rest.getEndTime() - gameClock) / (double) totalDuration);
+
+        int fillHeight = (int) Math.round(remainingFraction * cellSize);
+        if (fillHeight <= 0) return;
+
+        Graphics2D g = canvas.get().createGraphics();
+        g.setColor(REST_TINT);
+        g.fillRect(x, y + (cellSize - fillHeight), cellSize, fillHeight);
         g.dispose();
     }
 

@@ -5,6 +5,7 @@ import model.GameState;
 import model.Piece;
 import model.PendingJump;
 import model.PendingMove;
+import model.PendingRest;
 import model.Position;
 import rules.RuleEngine;
 
@@ -51,6 +52,10 @@ public class GameEngine {
     
     public List<PendingJump> getPendingJumps() {
         return (arbiter != null) ? arbiter.getActiveJumps() : new ArrayList<>();
+    }
+
+    public List<PendingRest> getPendingRests() {
+        return (arbiter != null) ? arbiter.getActiveRests() : new ArrayList<>();
     }
 
     public Optional<Piece> pieceAt(Position pos) {

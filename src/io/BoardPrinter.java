@@ -19,6 +19,7 @@ public class BoardPrinter {
     private final Board board;
     private final BoardRenderer renderer;
     private final MoveHistoryTracker historyTracker;
+    private final ScoreTracker scoreTracker;
     private GameEngine engine;
     private CommandRegistry registry;
 
@@ -26,14 +27,17 @@ public class BoardPrinter {
     private JLabel imageLabel;
     private JTextArea whiteMovesArea;
     private JTextArea blackMovesArea;
+    private JLabel whiteScoreLabel;
+    private JLabel blackScoreLabel;
     private Timer gameLoopTimer; // טיימר לניהול קצב המשחק בזמן אמת
-    private Timer historyTimer; // טיימר נפרד ואיטי - "צופה מהצד" על שינויים בלוח, לא מחובר לקוד ביצוע המהלכים
+    private Timer historyTimer; // טיימר נפרד ואיטי - "צופה מהצד" על שינויים בלוח, לא מחובר לקוד ביצוע המהלכים/התפיסות
     private long lastSystemTime; // מעקב אחר הזמן האמיתי של המחשב
 
     public BoardPrinter(Board board) {
         this.board = board;
         this.renderer = new BoardRenderer(board);
         this.historyTracker = new MoveHistoryTracker(board);
+        this.scoreTracker = new ScoreTracker(board);
     }
 
     public void setEngine(GameEngine engine) {
@@ -92,6 +96,7 @@ public class BoardPrinter {
             Img visualBoard = renderer.render(
                 engine.getPendingMoves(),
                 engine.getPendingJumps(),
+                engine.getPendingRests(),
                 engine.getGameClock()
             );
 
@@ -100,10 +105,12 @@ public class BoardPrinter {
             int boardHeight = visualBoard.get().getHeight();
             whiteMovesArea = createMovesArea();
             blackMovesArea = createMovesArea();
+            whiteScoreLabel = createScoreLabel();
+            blackScoreLabel = createScoreLabel();
 
-            guiWindow.add(wrapHistoryPanel("White", whiteMovesArea, boardHeight), BorderLayout.WEST);
+            guiWindow.add(buildSidePanel("לבן", whiteMovesArea, whiteScoreLabel, boardHeight), BorderLayout.WEST);
             guiWindow.add(imageLabel, BorderLayout.CENTER);
-            guiWindow.add(wrapHistoryPanel("Black", blackMovesArea, boardHeight), BorderLayout.EAST);
+            guiWindow.add(buildSidePanel("שחור", blackMovesArea, blackScoreLabel, boardHeight), BorderLayout.EAST);
 
             // מאזין עכבר לשליחת לחיצות
             imageLabel.addMouseListener(new MouseAdapter() {
@@ -135,11 +142,19 @@ public class BoardPrinter {
         return area;
     }
 
-    private JScrollPane wrapHistoryPanel(String title, JTextArea area, int boardHeight) {
-        JScrollPane scrollPane = new JScrollPane(area);
-        scrollPane.setPreferredSize(new Dimension(HISTORY_PANEL_WIDTH, boardHeight));
-        scrollPane.setBorder(BorderFactory.createTitledBorder(title));
-        return scrollPane;
+    private JLabel createScoreLabel() {
+        JLabel label = new JLabel("ניקוד: 0");
+        label.setHorizontalAlignment(SwingConstants.CENTER);
+        return label;
+    }
+
+    private JPanel buildSidePanel(String title, JTextArea movesArea, JLabel scoreLabel, int boardHeight) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setPreferredSize(new Dimension(HISTORY_PANEL_WIDTH, boardHeight));
+        panel.setBorder(BorderFactory.createTitledBorder(title));
+        panel.add(scoreLabel, BorderLayout.NORTH);
+        panel.add(new JScrollPane(movesArea), BorderLayout.CENTER);
+        return panel;
     }
 
     private void updateGUIImage() {
@@ -148,6 +163,7 @@ public class BoardPrinter {
             Img visualBoard = renderer.render(
                 engine.getPendingMoves(),
                 engine.getPendingJumps(),
+                engine.getPendingRests(),
                 engine.getGameClock()
             );
             imageLabel.setIcon(new ImageIcon(visualBoard.get()));
@@ -186,6 +202,7 @@ public class BoardPrinter {
     private void startHistoryLoop() {
         historyTimer = new Timer(HISTORY_POLL_MS, e -> {
             historyTracker.poll();
+            scoreTracker.poll();
             updateHistoryPanels();
         });
         historyTimer.start();
@@ -197,5 +214,7 @@ public class BoardPrinter {
         blackMovesArea.setText(String.join("\n", historyTracker.getBlackMoves()));
         whiteMovesArea.setCaretPosition(whiteMovesArea.getDocument().getLength());
         blackMovesArea.setCaretPosition(blackMovesArea.getDocument().getLength());
+        whiteScoreLabel.setText("ניקוד: " + scoreTracker.getWhiteScore());
+        blackScoreLabel.setText("ניקוד: " + scoreTracker.getBlackScore());
     }
 }
