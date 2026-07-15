@@ -7,11 +7,13 @@ import model.Board;
 import model.Piece;
 import model.PendingJump;
 import model.PendingMove;
+import model.PendingRest;
 import model.Position;
 import rules.PawnPromotion;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -19,6 +21,7 @@ public class RealTimeArbiter {
     private final Board board;
     private final List<PendingMove> activeMoves = new ArrayList<>();
     private final List<PendingJump> activeJumps = new ArrayList<>();
+    private final List<PendingRest> activeRests = new ArrayList<>();
     private long currentTimeMillis;
 
     public RealTimeArbiter(Board board) {
@@ -35,6 +38,15 @@ public class RealTimeArbiter {
 
     public List<PendingJump> getActiveJumps() {
         return activeJumps;
+    }
+
+    public List<PendingRest> getActiveRests() {
+        return activeRests;
+    }
+
+    private void beginRest(Piece piece, PieceState restState, long durationMs) {
+        piece.setState(restState);
+        activeRests.add(new PendingRest(piece, currentTimeMillis + durationMs));
     }
 
     public void startMove(Piece piece, Position source, Position destination) {
@@ -105,6 +117,17 @@ public class RealTimeArbiter {
         activeMoves.removeIf(m -> m.getPiece().getState() == PieceState.CAPTURED);
         activeJumps.removeIf(j -> j.getPiece().getState() == PieceState.CAPTURED);
 
+        Iterator<PendingRest> restIterator = activeRests.iterator();
+        while (restIterator.hasNext()) {
+            PendingRest rest = restIterator.next();
+            if (rest.getPiece().getState() == PieceState.CAPTURED) {
+                restIterator.remove();
+            } else if (rest.getEndTime() <= currentTimeMillis) {
+                rest.getPiece().setState(PieceState.IDLE);
+                restIterator.remove();
+            }
+        }
+
         return kingCaptured;
     }
 
@@ -117,20 +140,25 @@ public class RealTimeArbiter {
 
         Piece target = board.getPieceAt(destination);
         if (target != null && target.getColor() == movingPiece.getColor()) {
-            movingPiece.setState(PieceState.IDLE);
             board.addPiece(source, movingPiece);
+            beginRest(movingPiece, PieceState.LONG_REST, GameConfig.LONG_REST_DURATION_MS);
             return false;
         }
 
         boolean kingCaptured = false;
         if (target != null) {
-            board.removePiece(destination);
-            if (target.getKind() == PieceKind.KING) kingCaptured = true;
+            if (target.getState() == PieceState.JUMPING) {
+                // הכלי באוויר - לא נתפס עכשיו, רק מתפנה מהמשבצת עד שינחת; הוא זה שיתפוס את מי שינחת עליו
+                board.clearCellOnly(destination);
+            } else {
+                board.removePiece(destination);
+                if (target.getKind() == PieceKind.KING) kingCaptured = true;
+            }
         }
 
         Piece promotedPiece = PawnPromotion.applyPromotion(movingPiece, destination.getRow(), board.getRows());
         board.addPiece(destination, promotedPiece);
-        promotedPiece.setState(PieceState.IDLE);
+        beginRest(promotedPiece, PieceState.LONG_REST, GameConfig.LONG_REST_DURATION_MS);
 
         return kingCaptured;
     }
@@ -146,16 +174,13 @@ public class RealTimeArbiter {
 
         if (existingPiece == null) {
             board.addPiece(jumpPosition, piece);
-            piece.setState(PieceState.IDLE);
         } else if (existingPiece == piece) {
             // הכלי לא הוסר מהלוח בזמן הקפיצה, אז הוא כבר נמצא במקום הנחיתה
-            piece.setState(PieceState.IDLE);
         } else if (existingPiece.getColor() != piece.getColor()) {
-            board.removePiece(jumpPosition); 
+            board.removePiece(jumpPosition);
             if (existingPiece.getKind() == PieceKind.KING) kingCaptured = true;
-            
+
             board.addPiece(jumpPosition, piece);
-            piece.setState(PieceState.IDLE);
         } else {
             Position originalPos = piece.getCell();
             if (originalPos != null && board.getPieceAt(originalPos) == null) {
@@ -166,8 +191,9 @@ public class RealTimeArbiter {
                     board.addPiece(backup, piece);
                 }
             }
-            piece.setState(PieceState.IDLE);
         }
+
+        beginRest(piece, PieceState.SHORT_REST, GameConfig.SHORT_REST_DURATION_MS);
         return kingCaptured;
     }
 

@@ -54,8 +54,10 @@ public class BoardRenderer {
         for (int r = 0; r < board.getRows(); r++) {
             for (int c = 0; c < board.getCols(); c++) {
                 Piece piece = board.getPieceAt(new Position(r, c));
-                if (piece != null && piece.getState() == PieceState.IDLE) {
-                    drawPieceAnimated(canvas, piece, c * cellSize, r * cellSize, "idle", gameClock);
+                if (piece == null) continue;
+                String stateFolder = stateFolderFor(piece.getState());
+                if (stateFolder != null) {
+                    drawPieceAnimated(canvas, piece, c * cellSize, r * cellSize, stateFolder, gameClock);
                 }
             }
         }
@@ -135,6 +137,18 @@ public class BoardRenderer {
                 warnedPaths.put(path, true);
             }
             drawFallbackPiece(canvas, folderName, stateFolder, x, y);
+        }
+    }
+
+    /**
+     * ממפה מצב כלי לתיקיית האנימציה שלו על הלוח הראשי - MOVING/JUMPING מצוירים בנפרד (דרך drawMovingPiece/drawJumpingPiece)
+     */
+    private String stateFolderFor(PieceState state) {
+        switch (state) {
+            case IDLE: return "idle";
+            case LONG_REST: return "long_rest";
+            case SHORT_REST: return "short_rest";
+            default: return null;
         }
     }
 

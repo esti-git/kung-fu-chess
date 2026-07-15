@@ -31,6 +31,9 @@ public class RuleEngine {
         if (movingPiece == null) {
             return GameResult.fail("No piece selected");
         }
+        if (movingPiece.getState() != enums.PieceState.IDLE) {
+            return GameResult.fail("Piece cannot act right now");
+        }
 
         enums.PieceColor movingColor = movingPiece.getColor();
 

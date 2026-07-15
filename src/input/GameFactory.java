@@ -5,9 +5,24 @@ import engine.GameEngine;
 import io.BoardParser;
 import io.BoardPrinter;
 import model.GameState;
+import model.Piece;
 import realTime.RealTimeArbiter;
 
+import java.util.Arrays;
+import java.util.List;
+
 public class GameFactory {
+
+    private static final List<String> STANDARD_BOARD = Arrays.asList(
+            "bR bN bB bQ bK bB bN bR",
+            "bP bP bP bP bP bP bP bP",
+            ". . . . . . . .",
+            ". . . . . . . .",
+            ". . . . . . . .",
+            ". . . . . . . .",
+            "wP wP wP wP wP wP wP wP",
+            "wR wN wB wQ wK wB wN wR"
+    );
     private final MatrixBoard board;
     private final GameState state;
     private final GameEngine engine;
@@ -39,6 +54,14 @@ this.controller = new Controller(engine, boardMapper, printer);
 
     private GameState createGameState() {
         return new GameState(board);
+    }
+
+    /**
+     * מאתחל את הלוח ישירות למערך הפתיחה הסטנדרטי, בלי צורך בהקלדת "Board:" בקונסולה בכל הרצה.
+     */
+    public void initializeStandardBoard() {
+        List<Piece> pieces = boardParser.parse(STANDARD_BOARD);
+        board.initialize(pieces, boardParser.parseRows(STANDARD_BOARD), boardParser.parseCols(STANDARD_BOARD));
     }
 
     public MatrixBoard getBoard() { return board; }

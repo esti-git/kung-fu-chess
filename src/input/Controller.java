@@ -86,7 +86,7 @@ public class Controller {
         }
 
         engine.pieceAt(position).ifPresentOrElse(piece -> {
-            if (!engine.isPieceBusy(piece.getId())) {
+            if (piece.getState() == enums.PieceState.IDLE) {
                 selectedPosition = position;
             } else {
                 clearSelection();

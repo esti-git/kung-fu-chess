@@ -122,6 +122,7 @@ public GameResult<Void> requestJump(Position pos) {
 
     Piece currentPiece = state.getBoard().getPieceAt(pos);
     if (currentPiece == null) return GameResult.fail("No piece at jump position");
+    if (currentPiece.getState() != enums.PieceState.IDLE) return GameResult.fail("Piece cannot act right now");
     if (!canPieceJump(pos.getRow(), pos.getCol())) return GameResult.fail("Jump is not currently possible");
 
     if (arbiter != null) {

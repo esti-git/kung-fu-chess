@@ -92,13 +92,15 @@ public class BoardPrinter {
                 @Override
                 public void mousePressed(MouseEvent e) {
                     if (registry != null) {
+                        // דאבל קליק על משבצת מפעיל קפיצה, קליק בודד מפעיל בחירה/תנועה רגילה
+                        String commandType = (e.getClickCount() >= 2) ? "jump" : "click";
                         String[] commandParts = {
-                            "click", 
-                            String.valueOf(e.getX()), 
+                            commandType,
+                            String.valueOf(e.getX()),
                             String.valueOf(e.getY())
                         };
-                        registry.dispatch("click", commandParts);
-                        System.out.println("Mouse Click detected at Pixel: (" + e.getX() + ", " + e.getY() + ")");
+                        registry.dispatch(commandType, commandParts);
+                        System.out.println("Mouse " + commandType + " detected at Pixel: (" + e.getX() + ", " + e.getY() + ")");
                     }
                 }
             });
