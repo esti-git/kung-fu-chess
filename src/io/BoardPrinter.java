@@ -6,24 +6,34 @@ import model.Position;
 import input.CommandRegistry;
 
 import javax.swing.*;
+import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
 public class BoardPrinter {
 
+    private static final int HISTORY_PANEL_WIDTH = 160;
+    private static final int HISTORY_POLL_MS = 500; // אין צורך בעדכון מיידי - גם שנייה אחרי זה בסדר
+
     private final Board board;
     private final BoardRenderer renderer;
-    private GameEngine engine; 
-    private CommandRegistry registry; 
+    private final MoveHistoryTracker historyTracker;
+    private GameEngine engine;
+    private CommandRegistry registry;
 
-    private JFrame guiWindow; 
+    private JFrame guiWindow;
     private JLabel imageLabel;
+    private JTextArea whiteMovesArea;
+    private JTextArea blackMovesArea;
     private Timer gameLoopTimer; // טיימר לניהול קצב המשחק בזמן אמת
+    private Timer historyTimer; // טיימר נפרד ואיטי - "צופה מהצד" על שינויים בלוח, לא מחובר לקוד ביצוע המהלכים
     private long lastSystemTime; // מעקב אחר הזמן האמיתי של המחשב
 
     public BoardPrinter(Board board) {
         this.board = board;
         this.renderer = new BoardRenderer(board);
+        this.historyTracker = new MoveHistoryTracker(board);
     }
 
     public void setEngine(GameEngine engine) {
@@ -68,6 +78,7 @@ public class BoardPrinter {
         if (guiWindow == null) {
             initGUIWindow();
             startClockLoop(); // הפעלת השעון האוטומטי ברקע
+            startHistoryLoop(); // צופה איטי ונפרד שרק בודק מבחוץ מה השתנה בלוח
         } else {
             updateGUIImage();
         }
@@ -77,16 +88,23 @@ public class BoardPrinter {
         SwingUtilities.invokeLater(() -> {
             guiWindow = new JFrame("Kung Fu Chess");
             guiWindow.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            
+
             Img visualBoard = renderer.render(
                 engine.getPendingMoves(),
                 engine.getPendingJumps(),
                 engine.getGameClock()
             );
-            
+
             imageLabel = new JLabel(new ImageIcon(visualBoard.get()));
-            guiWindow.add(imageLabel);
-            
+
+            int boardHeight = visualBoard.get().getHeight();
+            whiteMovesArea = createMovesArea();
+            blackMovesArea = createMovesArea();
+
+            guiWindow.add(wrapHistoryPanel("White", whiteMovesArea, boardHeight), BorderLayout.WEST);
+            guiWindow.add(imageLabel, BorderLayout.CENTER);
+            guiWindow.add(wrapHistoryPanel("Black", blackMovesArea, boardHeight), BorderLayout.EAST);
+
             // מאזין עכבר לשליחת לחיצות
             imageLabel.addMouseListener(new MouseAdapter() {
                 @Override
@@ -109,6 +127,19 @@ public class BoardPrinter {
             guiWindow.setLocationRelativeTo(null);
             guiWindow.setVisible(true);
         });
+    }
+
+    private JTextArea createMovesArea() {
+        JTextArea area = new JTextArea();
+        area.setEditable(false);
+        return area;
+    }
+
+    private JScrollPane wrapHistoryPanel(String title, JTextArea area, int boardHeight) {
+        JScrollPane scrollPane = new JScrollPane(area);
+        scrollPane.setPreferredSize(new Dimension(HISTORY_PANEL_WIDTH, boardHeight));
+        scrollPane.setBorder(BorderFactory.createTitledBorder(title));
+        return scrollPane;
     }
 
     private void updateGUIImage() {
@@ -146,5 +177,25 @@ public class BoardPrinter {
             }
         });
         gameLoopTimer.start();
+    }
+
+    /**
+     * טיימר איטי ונפרד לגמרי מלולאת המשחק - רק "מציץ" בלוח מבחוץ ומזהה שינויים במיקומי הכלים.
+     * לא מקבל אף קריאה מקוד המהלכים/הקפיצות עצמו, ולכן אין צורך שיתעדכן מיידית.
+     */
+    private void startHistoryLoop() {
+        historyTimer = new Timer(HISTORY_POLL_MS, e -> {
+            historyTracker.poll();
+            updateHistoryPanels();
+        });
+        historyTimer.start();
+    }
+
+    private void updateHistoryPanels() {
+        if (whiteMovesArea == null || blackMovesArea == null) return;
+        whiteMovesArea.setText(String.join("\n", historyTracker.getWhiteMoves()));
+        blackMovesArea.setText(String.join("\n", historyTracker.getBlackMoves()));
+        whiteMovesArea.setCaretPosition(whiteMovesArea.getDocument().getLength());
+        blackMovesArea.setCaretPosition(blackMovesArea.getDocument().getLength());
     }
 }
