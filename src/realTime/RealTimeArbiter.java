@@ -52,15 +52,15 @@ public class RealTimeArbiter {
                 arrivalTime
         ));
         piece.setState(PieceState.MOVING);
+
+        if (board.getPieceAt(source) == piece) {
+            board.clearCellOnly(source);
+        }
     }
 
     public void startJump(Piece piece, Position position) {
         activeJumps.add(new PendingJump(position.getRow(), position.getCol(), piece, currentTimeMillis));
-        piece.setState(PieceState.MOVING);
-        
-        if (board.getPieceAt(position) == piece) {
-            board.clearCellOnly(position);
-        }
+        piece.setState(PieceState.JUMPING);
     }
 
     public boolean advance(long milliseconds) {
@@ -115,10 +115,6 @@ public class RealTimeArbiter {
         Position source = new Position(move.getFromRow(), move.getFromCol());
         Position destination = new Position(move.getToRow(), move.getToCol());
 
-        if (board.getPieceAt(source) == movingPiece) {
-            board.clearCellOnly(source);
-        }
-
         Piece target = board.getPieceAt(destination);
         if (target != null && target.getColor() == movingPiece.getColor()) {
             movingPiece.setState(PieceState.IDLE);
@@ -150,6 +146,9 @@ public class RealTimeArbiter {
 
         if (existingPiece == null) {
             board.addPiece(jumpPosition, piece);
+            piece.setState(PieceState.IDLE);
+        } else if (existingPiece == piece) {
+            // הכלי לא הוסר מהלוח בזמן הקפיצה, אז הוא כבר נמצא במקום הנחיתה
             piece.setState(PieceState.IDLE);
         } else if (existingPiece.getColor() != piece.getColor()) {
             board.removePiece(jumpPosition); 

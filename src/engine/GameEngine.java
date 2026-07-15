@@ -128,9 +128,9 @@ public GameResult<Void> requestJump(Position pos) {
         arbiter.startJump(currentPiece, pos);
     } else {
         getPendingJumps().add(new PendingJump(pos.getRow(), pos.getCol(), currentPiece, getGameClock()));
+        currentPiece.setState(enums.PieceState.JUMPING);
     }
-    
-    state.getBoard().clearCellOnly(pos); 
+
     return GameResult.success();
 }
 

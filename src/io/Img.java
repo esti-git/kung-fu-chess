@@ -58,6 +58,18 @@ public class Img {
 
     public Img read(String path) { return read(path, null, false, null); }
 
+    /* ----------- create a blank canvas ----------- */
+    public Img blank(int width, int height, Color bgColor) {
+        img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        if (bgColor != null) {
+            Graphics2D g = img.createGraphics();
+            g.setColor(bgColor);
+            g.fillRect(0, 0, width, height);
+            g.dispose();
+        }
+        return this;
+    }
+
     /* ----------- draw this image onto another ----------- */
     public void drawOn(Img other, int x, int y) {
         if (img == null || other.img == null)
