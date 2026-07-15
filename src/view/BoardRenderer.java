@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -33,6 +34,7 @@ public class BoardRenderer {
     private final Map<String, Integer> frameCountCache = new HashMap<>();
     private final Map<String, Integer> fpsCache = new HashMap<>();
     private final Map<String, Boolean> loopCache = new HashMap<>();
+    private final Map<Boolean, Img> woodTileCache = new HashMap<>();
 
     public BoardRenderer() {
         this.cellSize = GameConfig.CELL_SIZE;
@@ -71,6 +73,7 @@ public class BoardRenderer {
 
                 String stateFolder = stateFolderFor(piece.getState());
                 if (stateFolder != null) {
+                    drawPieceShadow(canvas, toPixelX(c), toPixelY(r));
                     drawPieceAnimated(canvas, piece, toPixelX(c), toPixelY(r), stateFolder, gameClock);
                 }
             }
@@ -94,16 +97,30 @@ public class BoardRenderer {
         return canvas;
     }
 
+    private static final Color FRAME_COLOR = new Color(92, 51, 23);
+
     /**
-     * פונקציית הגנה שמוודאת של-Img יש BufferedImage תקני ולא null
+     * פונקציית הגנה שמוודאת של-Img יש BufferedImage תקני ולא null, וצובעת מסביב מסגרת עץ עם מעט הבהקה (bevel)
      */
     private void ensureCanvasInitialized(Img canvas, int rows, int cols) {
         if (canvas.get() == null) {
             int width = cols * cellSize + LABEL_MARGIN * 2;
             int height = rows * cellSize + LABEL_MARGIN * 2;
-            // צביעת רקע זמני כהה כדי שלא נראה מסך שקוף או לבן במקרה של תקלה
-            canvas.blank(width, height, Color.DARK_GRAY);
+            canvas.blank(width, height, FRAME_COLOR);
+            drawFrameBevel(canvas, width, height);
         }
+    }
+
+    private void drawFrameBevel(Img canvas, int width, int height) {
+        Graphics2D g = canvas.get().createGraphics();
+        g.setStroke(new BasicStroke(2f));
+        g.setColor(FRAME_COLOR.brighter());
+        g.drawLine(1, 1, width - 2, 1);
+        g.drawLine(1, 1, 1, height - 2);
+        g.setColor(FRAME_COLOR.darker().darker());
+        g.drawLine(width - 2, 1, width - 2, height - 2);
+        g.drawLine(1, height - 2, width - 2, height - 2);
+        g.dispose();
     }
 
     /** ממיר מיקום עמודה/שורה בלוח לקואורדינטת פיקסלים בקנבס, כולל היסט השוליים של התוויות */
@@ -115,18 +132,62 @@ public class BoardRenderer {
         return LABEL_MARGIN + (int) Math.round(row * cellSize);
     }
 
-    private static final Color LIGHT_SQUARE = new Color(240, 217, 181);
-    private static final Color DARK_SQUARE = new Color(181, 136, 99);
+    private static final Color LIGHT_WOOD_BASE = new Color(222, 184, 135);
+    private static final Color DARK_WOOD_BASE = new Color(139, 94, 60);
 
     private void drawGrid(Img canvas, int rows, int cols) {
-        Graphics2D g = canvas.get().createGraphics();
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
-                g.setColor((r + c) % 2 == 0 ? LIGHT_SQUARE : DARK_SQUARE);
-                g.fillRect(toPixelX(c), toPixelY(r), cellSize, cellSize);
+                boolean light = (r + c) % 2 == 0;
+                getWoodTile(light).drawOn(canvas, toPixelX(c), toPixelY(r));
             }
         }
+    }
+
+    /**
+     * מייצר (ומטמין במטמון) משבצת עץ עם גרדיאנט תאורה עדין וגרעיני עץ אקראיים אך קבועים (אותו seed בכל פעם) -
+     * במקום צביעת מלבן שטוח
+     */
+    private Img getWoodTile(boolean light) {
+        Img cached = woodTileCache.get(light);
+        if (cached != null) return cached;
+
+        Color base = light ? LIGHT_WOOD_BASE : DARK_WOOD_BASE;
+        BufferedImage tile = new BufferedImage(cellSize, cellSize, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = tile.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // גרדיאנט עדין מכיוון אור עליון-שמאלי, לתחושת עומק
+        g.setPaint(new java.awt.GradientPaint(0, 0, base.brighter(), cellSize, cellSize, base.darker()));
+        g.fillRect(0, 0, cellSize, cellSize);
+
+        // גרעיני עץ - קווים דקים גליים, seed קבוע כדי שהמרקם לא ירצד בין פריימים
+        Random random = new Random(light ? 1001L : 2002L);
+        for (int i = 0; i < 14; i++) {
+            int y = random.nextInt(cellSize);
+            boolean brighten = random.nextBoolean();
+            Color grain = brighten ? base.brighter() : base.darker();
+            int alpha = 40 + random.nextInt(50);
+            g.setColor(new Color(grain.getRed(), grain.getGreen(), grain.getBlue(), alpha));
+
+            int waveHeight = 2 + random.nextInt(4);
+            int segments = 6;
+            int[] xs = new int[segments + 1];
+            int[] ys = new int[segments + 1];
+            for (int s = 0; s <= segments; s++) {
+                xs[s] = s * cellSize / segments;
+                ys[s] = y + (int) (Math.sin(s * 1.3 + i) * waveHeight);
+            }
+            for (int s = 0; s < segments; s++) {
+                g.drawLine(xs[s], ys[s], xs[s + 1], ys[s + 1]);
+            }
+        }
+
         g.dispose();
+
+        Img img = new Img().wrap(tile);
+        woodTileCache.put(light, img);
+        return img;
     }
 
     private static final Color LABEL_COLOR = new Color(50, 50, 50);
@@ -179,6 +240,29 @@ public class BoardRenderer {
         Graphics2D g = canvas.get().createGraphics();
         g.setColor(REST_TINT);
         g.fillRect(x, y + (cellSize - fillHeight), cellSize, fillHeight);
+        g.dispose();
+    }
+
+    /**
+     * צל רך (מקורב על ידי כמה עיגולים חצי-שקופים בגדלים שונים) מתחת למקום בו הכלי יצויר -
+     * נותן תחושת "הכלי עומד" על הלוח במקום לרחף שטוח מעליו
+     */
+    private void drawPieceShadow(Img canvas, int x, int y) {
+        Graphics2D g = canvas.get().createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        int shadowWidth = (int) (cellSize * 0.6);
+        int shadowHeight = (int) (cellSize * 0.18);
+        int shadowX = x + (cellSize - shadowWidth) / 2;
+        int shadowY = y + cellSize - shadowHeight - (int) (cellSize * 0.06);
+
+        for (int i = 3; i >= 0; i--) {
+            int alpha = Math.min(90, 18 * (4 - i));
+            g.setColor(new Color(0, 0, 0, alpha));
+            int inset = i * 3;
+            g.fillOval(shadowX + inset, shadowY + inset / 2, shadowWidth - inset * 2, shadowHeight - inset);
+        }
+
         g.dispose();
     }
 
@@ -275,9 +359,10 @@ public class BoardRenderer {
         double row = fromRow + (toRow - fromRow) * t;
 
         long elapsedMs = gameClock - startTime;
-        drawPieceAnimated(canvas, move.getPiece(),
-                toPixelX(col), toPixelY(row),
-                "move", elapsedMs);
+        int pixelX = toPixelX(col);
+        int pixelY = toPixelY(row);
+        drawPieceShadow(canvas, pixelX, pixelY);
+        drawPieceAnimated(canvas, move.getPiece(), pixelX, pixelY, "move", elapsedMs);
     }
 
     private void drawJumpingPiece(Img canvas, PendingJumpSnapshot jump, long gameClock) {
@@ -288,14 +373,33 @@ public class BoardRenderer {
         int jumpHeight = cellSize / 2;
         int yOffset = (int) Math.round(-Math.sin(t * Math.PI) * jumpHeight);
 
+        int groundX = toPixelX(jump.getCol());
+        int groundY = toPixelY(jump.getRow());
+        // הצל נשאר על הקרקע בזמן שהכלי קופץ מעליו - נותן תחושת קפיצה אמיתית
+        drawPieceShadow(canvas, groundX, groundY);
+
         long elapsedMs = gameClock - jump.getStartTime();
-        drawPieceAnimated(canvas, jump.getPiece(),
-                toPixelX(jump.getCol()), toPixelY(jump.getRow()) + yOffset,
-                "jump", elapsedMs);
+        drawPieceAnimated(canvas, jump.getPiece(), groundX, groundY + yOffset, "jump", elapsedMs);
     }
 
     private double clamp01(double v) {
         return Math.max(0.0, Math.min(1.0, v));
+    }
+
+    /** גרדיאנט תלת-נקודתי: הבהקה -> בסיס -> צל, לפי מרחק רדיאלי מנורמל (0=מרכז ההבהקה) */
+    private Color shadeColor(Color highlight, Color base, Color shadow, double distance) {
+        if (distance < 0.45) {
+            return lerp(highlight, base, distance / 0.45);
+        }
+        return lerp(base, shadow, (distance - 0.45) / 0.85);
+    }
+
+    private Color lerp(Color a, Color b, double t) {
+        t = clamp01(t);
+        int r = (int) Math.round(a.getRed() + (b.getRed() - a.getRed()) * t);
+        int g = (int) Math.round(a.getGreen() + (b.getGreen() - a.getGreen()) * t);
+        int bl = (int) Math.round(a.getBlue() + (b.getBlue() - a.getBlue()) * t);
+        return new Color(r, g, bl);
     }
 
     private int getFrameCount(String folderName, String stateFolder) {
@@ -371,8 +475,9 @@ public class BoardRenderer {
     }
 
     /**
-     * צובע מחדש את דמות הכלי לשחור/לבן (לפי האות האחרונה בשם התיקייה, למשל PW/PB) -
-     * שומר על ערוץ השקיפות המקורי (הצללית) אבל מחליף את הצבע עצמו לצבע אחיד
+     * צובע מחדש את דמות הכלי לשחור/לבן (לפי האות האחרונה בשם התיקייה, למשל PW/PB) עם גרדיאנט רדיאלי
+     * (הבהקה בפינה עליונה-שמאלית, החשכה כלפי הקצוות) לתחושת חומר מבריק/תלת-ממדי, במקום צבע שטוח אחיד -
+     * שומר על ערוץ השקיפות המקורי (הצללית)
      */
     private static final int OUTLINE_WIDTH = 2;
     private static final int OUTLINE_ALPHA_THRESHOLD = 40; // מתעלם מפיקסלי אנטי-אליאסינג חלשים מדי כשבודקים "צורה אטומה"
@@ -383,9 +488,11 @@ public class BoardRenderer {
         if (buffered == null) return;
 
         boolean isWhite = folderName.charAt(folderName.length() - 1) == 'W';
-        Color fillColor = isWhite ? Color.WHITE : Color.BLACK;
-        // מסגרת בצבע ניגודי כדי שכלים לבנים לא "ייעלמו" על משבצות בהירות (ולהפך)
-        Color outlineColor = isWhite ? Color.BLACK : new Color(230, 230, 230);
+        Color highlight = isWhite ? Color.WHITE : new Color(95, 95, 95);
+        Color base = isWhite ? new Color(230, 230, 235) : new Color(35, 35, 38);
+        Color shadow = isWhite ? new Color(165, 165, 175) : Color.BLACK;
+        // מסגרת בצבע ניגודי כדי שכלים לבנים לא "ייעלמו" על הלוח (ולהפך)
+        Color outlineColor = isWhite ? new Color(40, 40, 40) : new Color(225, 225, 230);
 
         int width = buffered.getWidth();
         int height = buffered.getHeight();
@@ -400,13 +507,20 @@ public class BoardRenderer {
             }
         }
 
-        int fillRgb = fillColor.getRGB() & 0x00FFFFFF;
+        double highlightX = width * 0.32;
+        double highlightY = height * 0.28;
+        double radius = Math.max(width, height) * 0.75;
+
         int outlineArgb = outlineColor.getRGB() | 0xFF000000;
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 int alpha = originalArgb[y][x] >>> 24;
                 if (alpha > 0) {
-                    buffered.setRGB(x, y, (alpha << 24) | fillRgb);
+                    double dx = x - highlightX;
+                    double dy = y - highlightY;
+                    double dist = Math.sqrt(dx * dx + dy * dy) / radius;
+                    int rgb = shadeColor(highlight, base, shadow, dist).getRGB() & 0x00FFFFFF;
+                    buffered.setRGB(x, y, (alpha << 24) | rgb);
                 } else if (isNearOpaquePixel(isOpaque, x, y, width, height)) {
                     buffered.setRGB(x, y, outlineArgb);
                 }

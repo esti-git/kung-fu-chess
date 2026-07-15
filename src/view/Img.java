@@ -58,6 +58,12 @@ public class Img {
 
     public Img read(String path) { return read(path, null, false, null); }
 
+    /* ----------- wrap an already-built image (e.g. a procedurally generated tile) ----------- */
+    public Img wrap(BufferedImage image) {
+        this.img = image;
+        return this;
+    }
+
     /* ----------- create a blank canvas ----------- */
     public Img blank(int width, int height, Color bgColor) {
         img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
