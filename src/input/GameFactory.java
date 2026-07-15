@@ -3,7 +3,7 @@ package input;
 import board.MatrixBoard;
 import engine.GameEngine;
 import io.BoardParser;
-import io.BoardPrinter;
+import view.BoardPrinter;
 import model.GameState;
 import model.Piece;
 import realTime.RealTimeArbiter;
@@ -39,7 +39,7 @@ public GameFactory() {
     this.engine = new GameEngine(state);
     this.arbiter = new RealTimeArbiter(board);
     this.engine.setArbiter(arbiter);
-    this.printer = new BoardPrinter(board);
+    this.printer = new BoardPrinter();
     
     this.printer.setEngine(engine); 
     

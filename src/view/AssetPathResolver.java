@@ -1,4 +1,4 @@
-package io;
+package view;
 
 import model.Piece;
 import enums.PieceColor;

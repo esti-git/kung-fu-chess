@@ -1,19 +1,19 @@
-package io;
+package view;
 
 import engine.GameEngine;
 import enums.PieceColor;
-import model.Board;
-import model.Position;
 import input.CommandRegistry;
 import input.Controller;
 
 import javax.swing.*;
+import javax.swing.border.TitledBorder;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
+import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -21,11 +21,15 @@ import java.awt.image.BufferedImage;
 
 public class BoardPrinter {
 
-    private static final int HISTORY_PANEL_WIDTH = 160;
+    private static final int HISTORY_PANEL_WIDTH = 190;
+    private static final Color PANEL_BACKGROUND = new Color(245, 245, 240);
+    private static final Color PANEL_ACCENT = new Color(90, 90, 90);
+    private static final Font MOVES_FONT = new Font("Consolas", Font.PLAIN, 14);
+    private static final Font SCORE_FONT = new Font("Segoe UI", Font.BOLD, 18);
+    private static final Font TITLE_FONT = new Font("Segoe UI", Font.BOLD, 15);
     private static final int HISTORY_POLL_MS = 500; // אין צורך בעדכון מיידי - גם שנייה אחרי זה בסדר
     private static final int RESTART_DELAY_MS = 3000; // כמה זמן להציג GAME OVER לפני שמתחיל משחק חדש
 
-    private final Board board;
     private final BoardRenderer renderer;
     private final MoveHistoryTracker historyTracker;
     private final ScoreTracker scoreTracker;
@@ -45,11 +49,10 @@ public class BoardPrinter {
     private long lastSystemTime; // מעקב אחר הזמן האמיתי של המחשב
     private boolean gameOverHandled; // מונע הפעלה כפולה של טיימר ההתחלה מחדש כל עוד המשחק עדיין נגמר
 
-    public BoardPrinter(Board board) {
-        this.board = board;
-        this.renderer = new BoardRenderer(board);
-        this.historyTracker = new MoveHistoryTracker(board);
-        this.scoreTracker = new ScoreTracker(board);
+    public BoardPrinter() {
+        this.renderer = new BoardRenderer();
+        this.historyTracker = new MoveHistoryTracker();
+        this.scoreTracker = new ScoreTracker();
     }
 
     public void setEngine(GameEngine engine) {
@@ -88,14 +91,16 @@ public class BoardPrinter {
         }
     }
 
-    // הדפסה טקסטואלית לקונסול
+    // הדפסה טקסטואלית לקונסול - קוראת רק מתמונת מצב, לא מהלוח החי
     public void printConsole() {
-        for (int i = 0; i < board.getRows(); i++) {
+        if (engine == null) return;
+        BoardSnapshot snapshot = engine.captureSnapshot();
+        for (int i = 0; i < snapshot.getRows(); i++) {
             StringBuilder rowStr = new StringBuilder();
-            for (int j = 0; j < board.getCols(); j++) {
-                model.Piece piece = board.getPieceAt(new Position(i, j));
+            for (int j = 0; j < snapshot.getCols(); j++) {
+                PieceSnapshot piece = snapshot.getPieceAt(i, j);
                 rowStr.append(piece == null ? "." : piece.getRepresentation());
-                if (j < board.getCols() - 1) rowStr.append(" ");
+                if (j < snapshot.getCols() - 1) rowStr.append(" ");
             }
             System.out.println(rowStr.toString());
         }
@@ -104,7 +109,7 @@ public class BoardPrinter {
     // הדפסה גרפית לחלון והפעלת השעון בזמן אמת
     public void printGUI() {
         if (engine == null) return;
-        
+
         // אתחול חלון ה-GUI פעם אחת בלבד
         if (guiWindow == null) {
             initGUIWindow();
@@ -120,13 +125,8 @@ public class BoardPrinter {
             guiWindow = new JFrame("Kung Fu Chess");
             guiWindow.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-            Img visualBoard = renderer.render(
-                engine.getPendingMoves(),
-                engine.getPendingJumps(),
-                engine.getPendingRests(),
-                (controller != null) ? controller.selectedPosition() : null,
-                engine.getGameClock()
-            );
+            BoardSnapshot snapshot = engine.captureSnapshot();
+            Img visualBoard = renderer.render(snapshot, (controller != null) ? controller.selectedPosition() : null);
 
             imageLabel = new JLabel(new ImageIcon(visualBoard.get()));
 
@@ -167,34 +167,48 @@ public class BoardPrinter {
     private JTextArea createMovesArea() {
         JTextArea area = new JTextArea();
         area.setEditable(false);
+        area.setFont(MOVES_FONT);
+        area.setBackground(PANEL_BACKGROUND);
+        area.setForeground(new Color(40, 40, 40));
+        area.setMargin(new Insets(8, 10, 8, 10));
         return area;
     }
 
     private JLabel createScoreLabel() {
         JLabel label = new JLabel("ניקוד: 0");
         label.setHorizontalAlignment(SwingConstants.CENTER);
+        label.setFont(SCORE_FONT);
+        label.setOpaque(true);
+        label.setBackground(PANEL_ACCENT);
+        label.setForeground(Color.WHITE);
+        label.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
         return label;
     }
 
     private JPanel buildSidePanel(String title, JTextArea movesArea, JLabel scoreLabel, int boardHeight) {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setPreferredSize(new Dimension(HISTORY_PANEL_WIDTH, boardHeight));
-        panel.setBorder(BorderFactory.createTitledBorder(title));
+        panel.setBackground(PANEL_BACKGROUND);
+
+        TitledBorder titledBorder = BorderFactory.createTitledBorder(
+                BorderFactory.createLineBorder(PANEL_ACCENT, 2), title);
+        titledBorder.setTitleFont(TITLE_FONT);
+        titledBorder.setTitleColor(PANEL_ACCENT);
+        panel.setBorder(titledBorder);
+
+        JScrollPane scrollPane = new JScrollPane(movesArea);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+
         panel.add(scoreLabel, BorderLayout.NORTH);
-        panel.add(new JScrollPane(movesArea), BorderLayout.CENTER);
+        panel.add(scrollPane, BorderLayout.CENTER);
         return panel;
     }
 
     private void updateGUIImage() {
         SwingUtilities.invokeLater(() -> {
             if (engine == null || imageLabel == null) return;
-            Img visualBoard = renderer.render(
-                engine.getPendingMoves(),
-                engine.getPendingJumps(),
-                engine.getPendingRests(),
-                (controller != null) ? controller.selectedPosition() : null,
-                engine.getGameClock()
-            );
+            BoardSnapshot snapshot = engine.captureSnapshot();
+            Img visualBoard = renderer.render(snapshot, (controller != null) ? controller.selectedPosition() : null);
             if (engine.isGameOver()) {
                 drawGameOverOverlay(visualBoard.get());
             }
@@ -283,8 +297,10 @@ public class BoardPrinter {
      */
     private void startHistoryLoop() {
         historyTimer = new Timer(HISTORY_POLL_MS, e -> {
-            historyTracker.poll();
-            scoreTracker.poll();
+            if (engine == null) return;
+            BoardSnapshot snapshot = engine.captureSnapshot();
+            historyTracker.poll(snapshot);
+            scoreTracker.poll(snapshot);
             updateHistoryPanels();
         });
         historyTimer.start();

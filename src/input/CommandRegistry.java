@@ -1,7 +1,7 @@
 package input;
 
 import engine.GameEngine;
-import io.BoardPrinter;
+import view.BoardPrinter;
 
 public class CommandRegistry {
 

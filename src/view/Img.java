@@ -1,4 +1,4 @@
-package io;
+package view;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -80,7 +80,7 @@ public class Img {
             throw new IllegalArgumentException("Patch exceeds destination bounds.");
 
         Graphics2D g = other.img.createGraphics();
-        g.setComposite(AlphaComposite.SrcOver);                               // handles alpha channel :contentReference[oaicite:3]{index=3}
+        g.setComposite(AlphaComposite.SrcOver);                               // handles alpha channel :contentReference[oaicite:3]{index=3}
         g.drawImage(img, x, y, null);                                        // :contentReference[oaicite:4]{index=4}
         g.dispose();
     }

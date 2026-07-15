@@ -2,7 +2,7 @@ package input;
 
 import engine.GameEngine;
 import engine.GameResult;
-import io.BoardPrinter;
+import view.BoardPrinter;
 import model.Piece;
 import model.Position;
 

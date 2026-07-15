@@ -21,10 +21,18 @@ public class BoardMapper {
      */
     public Optional<Position> pixelToCell(int x, int y) {
         int cellSize = GameConfig.CELL_SIZE;
+        int margin = GameConfig.BOARD_LABEL_MARGIN;
+
+        // הזזה לפי שולי התוויות (אותיות/מספרים) סביב הלוח - לחיצה בתוך השוליים עצמם לא נחשבת
+        int adjustedX = x - margin;
+        int adjustedY = y - margin;
+        if (adjustedX < 0 || adjustedY < 0) {
+            return Optional.empty();
+        }
 
         // חישוב האינדקסים על בסיס גודל המשבצת
-        int col = x / cellSize;
-        int row = y / cellSize;
+        int col = adjustedX / cellSize;
+        int row = adjustedY / cellSize;
 
         // וידוא שהלחיצה נמצאת בתוך גבולות הלוח האמיתיים
         if (row >= 0 && row < board.getRows() && col >= 0 && col < board.getCols()) {

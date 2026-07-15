@@ -5,6 +5,7 @@ import enums.PieceColor;
 import enums.PieceKind;
 import enums.PieceState;
 import model.Board;
+import model.CaptureRecord;
 import model.Piece;
 import model.PendingJump;
 import model.PendingMove;
@@ -13,6 +14,7 @@ import model.Position;
 import rules.PawnPromotion;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -23,6 +25,7 @@ public class RealTimeArbiter {
     private final List<PendingMove> activeMoves = new ArrayList<>();
     private final List<PendingJump> activeJumps = new ArrayList<>();
     private final List<PendingRest> activeRests = new ArrayList<>();
+    private final List<CaptureRecord> captureLog = new ArrayList<>();
     private long currentTimeMillis;
     private PieceColor winnerColor;
 
@@ -50,11 +53,17 @@ public class RealTimeArbiter {
         return winnerColor;
     }
 
-    /** מנקה תנועות/קפיצות/מנוחות פעילות - לשימוש כשמתחילים משחק חדש על אותו לוח */
+    /** יומן תפיסות מצטבר - נשמר גם אחרי שכלי כבר לא בלוח, כדי שהצופה בניקוד לא יצטרך לגעת בלוח/בכלים חיים */
+    public List<CaptureRecord> getCaptureLog() {
+        return Collections.unmodifiableList(captureLog);
+    }
+
+    /** מנקה תנועות/קפיצות/מנוחות/יומן תפיסות פעילים - לשימוש כשמתחילים משחק חדש על אותו לוח */
     public void reset() {
         activeMoves.clear();
         activeJumps.clear();
         activeRests.clear();
+        captureLog.clear();
         winnerColor = null;
     }
 
@@ -166,6 +175,7 @@ public class RealTimeArbiter {
                 board.clearCellOnly(destination);
             } else {
                 board.removePiece(destination);
+                captureLog.add(new CaptureRecord(target.getColor(), target.getKind()));
                 if (target.getKind() == PieceKind.KING) {
                     kingCaptured = true;
                     winnerColor = movingPiece.getColor();
@@ -195,6 +205,7 @@ public class RealTimeArbiter {
             // הכלי לא הוסר מהלוח בזמן הקפיצה, אז הוא כבר נמצא במקום הנחיתה
         } else if (existingPiece.getColor() != piece.getColor()) {
             board.removePiece(jumpPosition);
+            captureLog.add(new CaptureRecord(existingPiece.getColor(), existingPiece.getKind()));
             if (existingPiece.getKind() == PieceKind.KING) {
                 kingCaptured = true;
                 winnerColor = piece.getColor();
