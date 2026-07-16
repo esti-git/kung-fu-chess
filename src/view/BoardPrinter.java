@@ -4,6 +4,7 @@ import engine.GameEngine;
 import enums.PieceColor;
 import input.CommandRegistry;
 import input.Controller;
+import input.GameLoop;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
@@ -33,7 +34,6 @@ public class BoardPrinter {
     private static final Font SCORE_FONT = new Font("Segoe UI", Font.BOLD, 18);
     private static final Font TITLE_FONT = new Font("Segoe UI", Font.BOLD, 15);
     private static final int HISTORY_POLL_MS = 500; // אין צורך בעדכון מיידי - גם שנייה אחרי זה בסדר
-    private static final int RESTART_DELAY_MS = 3000; // כמה זמן להציג GAME OVER לפני שמתחיל משחק חדש
 
     private final BoardRenderer renderer;
     private final BoardSnapshotFactory snapshotFactory;
@@ -56,10 +56,8 @@ public class BoardPrinter {
     private JLabel blackScoreLabel;
     private int baselineWidth;
     private int baselineHeight;
-    private Timer gameLoopTimer; // טיימר לניהול קצב המשחק בזמן אמת
+    private GameLoop gameLoop; // מריץ את לולאת הזמן-אמת של המשחק (קצב, שעון המנוע, restart)
     private Timer historyTimer; // טיימר נפרד ואיטי - "צופה מהצד" על שינויים בלוח, לא מחובר לקוד ביצוע המהלכים/התפיסות
-    private long lastSystemTime; // מעקב אחר הזמן האמיתי של המחשב
-    private boolean gameOverHandled; // מונע הפעלה כפולה של טיימר ההתחלה מחדש כל עוד המשחק עדיין נגמר
 
     public BoardPrinter() {
         this.renderer = new BoardRenderer();
@@ -82,6 +80,9 @@ public class BoardPrinter {
 
     public void setRestartAction(Runnable restartAction) {
         this.restartAction = restartAction;
+        if (gameLoop != null) {
+            gameLoop.setRestartAction(restartAction);
+        }
     }
 
     /** מאפס את תצוגות ההיסטוריה והניקוד - נקרא לאחר שמשחק חדש מתחיל */
@@ -126,7 +127,7 @@ public class BoardPrinter {
         // אתחול חלון ה-GUI פעם אחת בלבד
         if (guiWindow == null) {
             initGUIWindow();
-            startClockLoop(); // הפעלת השעון האוטומטי ברקע
+            startGameLoop(); // הפעלת לולאת הזמן-אמת (GameLoop) ברקע
             startHistoryLoop(); // צופה איטי ונפרד שרק בודק מבחוץ מה השתנה בלוח
         } else {
             updateGUIImage();
@@ -314,49 +315,12 @@ public class BoardPrinter {
     }
 
     /**
-     * פונקציה המפעילה לולאת זמן קבועה שמעדכנת את מנוע המשחק
-     * ודואגת להזיז את הכלים בצורה חלקה על המסך הגרפי
+     * מאציל את הרצת הזמן-אמת (קצב, שעון המנוע, restart) ל-GameLoop; ה-printer רק מצייר בכל טיק
      */
-    private void startClockLoop() {
-        lastSystemTime = System.currentTimeMillis();
-
-        // הרצת עדכון בכל 16 מילישניות (כ-60 FPS)
-        gameLoopTimer = new Timer(16, e -> {
-            if (engine == null) return;
-
-            if (engine.isGameOver()) {
-                if (!gameOverHandled) {
-                    gameOverHandled = true;
-                    scheduleRestart();
-                }
-            } else {
-                long currentTime = System.currentTimeMillis();
-                long elapsed = currentTime - lastSystemTime;
-                lastSystemTime = currentTime;
-
-                // קידום השעון הפנימי של המנוע בזמן שחלף בפועל!
-                engine.advanceClock(elapsed);
-            }
-
-            // ריענון הציור על המסך תמיד - כך שגם מסך ה-GAME OVER יישאר מוצג
-            updateGUIImage();
-        });
-        gameLoopTimer.start();
-    }
-
-    /**
-     * לאחר עיכוב קצר, מפעיל את פעולת ההתחלה-מחדש (אם חוברה) ומשחרר את הדגל כדי שהמחזור יוכל לקרות שוב
-     */
-    private void scheduleRestart() {
-        Timer restartTimer = new Timer(RESTART_DELAY_MS, e -> {
-            if (restartAction != null) {
-                restartAction.run();
-            }
-            lastSystemTime = System.currentTimeMillis();
-            gameOverHandled = false;
-        });
-        restartTimer.setRepeats(false);
-        restartTimer.start();
+    private void startGameLoop() {
+        gameLoop = new GameLoop(engine, this::updateGUIImage);
+        gameLoop.setRestartAction(restartAction);
+        gameLoop.start();
     }
 
     /**
