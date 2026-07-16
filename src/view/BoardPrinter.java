@@ -22,8 +22,9 @@ import java.awt.image.BufferedImage;
 public class BoardPrinter {
 
     private static final int HISTORY_PANEL_WIDTH = 190;
-    private static final Color PANEL_BACKGROUND = new Color(245, 245, 240);
-    private static final Color PANEL_ACCENT = new Color(90, 90, 90);
+    private static final Color PANEL_BACKGROUND = new Color(26, 26, 30); // כהה, תואם למסגרת הכהה של הלוח
+    private static final Color PANEL_ACCENT = new Color(191, 155, 87); // אותו זהב/ברונזה כמו מסגרת הלוח - מאחד את העיצוב
+    private static final Color PANEL_TEXT = new Color(225, 222, 215);
     private static final Font MOVES_FONT = new Font("Consolas", Font.PLAIN, 14);
     private static final Font SCORE_FONT = new Font("Segoe UI", Font.BOLD, 18);
     private static final Font TITLE_FONT = new Font("Segoe UI", Font.BOLD, 15);
@@ -169,7 +170,8 @@ public class BoardPrinter {
         area.setEditable(false);
         area.setFont(MOVES_FONT);
         area.setBackground(PANEL_BACKGROUND);
-        area.setForeground(new Color(40, 40, 40));
+        area.setForeground(PANEL_TEXT);
+        area.setCaretColor(PANEL_TEXT);
         area.setMargin(new Insets(8, 10, 8, 10));
         return area;
     }
@@ -180,7 +182,7 @@ public class BoardPrinter {
         label.setFont(SCORE_FONT);
         label.setOpaque(true);
         label.setBackground(PANEL_ACCENT);
-        label.setForeground(Color.WHITE);
+        label.setForeground(new Color(30, 28, 24));
         label.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
         return label;
     }
