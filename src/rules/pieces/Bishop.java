@@ -17,4 +17,6 @@ public class Bishop extends Piece {
         int deltaCol = Math.abs(toCol - fromCol);
         return deltaRow == deltaCol;
     }
+
+    @Override public boolean isSlidingPiece() { return true; }
 }

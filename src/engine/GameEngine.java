@@ -1,8 +1,8 @@
 package engine;
 
+import common.GameResult;
 import config.GameConfig;
 import enums.PieceColor;
-import model.Board;
 import model.CaptureRecord;
 import model.GameState;
 import model.Piece;
@@ -11,14 +11,9 @@ import model.PendingMove;
 import model.PendingRest;
 import model.Position;
 import rules.RuleEngine;
-import view.BoardSnapshot;
-import view.CaptureSnapshot;
-import view.PendingJumpSnapshot;
-import view.PendingMoveSnapshot;
-import view.PendingRestSnapshot;
-import view.PieceSnapshot;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -71,55 +66,9 @@ public class GameEngine {
         return (arbiter != null) ? arbiter.getActiveRests() : new ArrayList<>();
     }
 
-    /**
-     * בונה תמונת מצב קפואה של הלוח והפעולות הפעילות - זה היחיד שקורא ל-board.getPieceAt(...) לצורך התצוגה;
-     * כל שאר קוד התצוגה (renderer, היסטוריית מהלכים, ניקוד) קורא רק מהתמונה הזו, לא מהלוח החי.
-     */
-    public BoardSnapshot captureSnapshot() {
-        Board board = state.getBoard();
-        int rows = board.getRows();
-        int cols = board.getCols();
-
-        PieceSnapshot[][] cells = new PieceSnapshot[rows][cols];
-        for (int r = 0; r < rows; r++) {
-            for (int c = 0; c < cols; c++) {
-                Piece piece = board.getPieceAt(new Position(r, c));
-                if (piece != null) {
-                    cells[r][c] = toSnapshot(piece);
-                }
-            }
-        }
-
-        List<PendingMoveSnapshot> moveSnapshots = new ArrayList<>();
-        for (PendingMove move : getPendingMoves()) {
-            moveSnapshots.add(new PendingMoveSnapshot(
-                    move.getFromRow(), move.getFromCol(), move.getToRow(), move.getToCol(),
-                    toSnapshot(move.getPiece()), move.getArrivalTime()));
-        }
-
-        List<PendingJumpSnapshot> jumpSnapshots = new ArrayList<>();
-        for (PendingJump jump : getPendingJumps()) {
-            jumpSnapshots.add(new PendingJumpSnapshot(
-                    jump.getRow(), jump.getCol(), toSnapshot(jump.getPiece()), jump.getStartTime(), jump.getEndTime()));
-        }
-
-        List<PendingRestSnapshot> restSnapshots = new ArrayList<>();
-        for (PendingRest rest : getPendingRests()) {
-            restSnapshots.add(new PendingRestSnapshot(toSnapshot(rest.getPiece()), rest.getEndTime()));
-        }
-
-        List<CaptureSnapshot> captureSnapshots = new ArrayList<>();
-        if (arbiter != null) {
-            for (CaptureRecord record : arbiter.getCaptureLog()) {
-                captureSnapshots.add(new CaptureSnapshot(record.getCapturedColor(), record.getCapturedKind()));
-            }
-        }
-
-        return new BoardSnapshot(rows, cols, cells, moveSnapshots, jumpSnapshots, restSnapshots, captureSnapshots, getGameClock());
-    }
-
-    private PieceSnapshot toSnapshot(Piece piece) {
-        return new PieceSnapshot(piece.getId(), piece.getColor(), piece.getKind(), piece.getRepresentation(), piece.getState());
+    /** Cumulative capture log - kept even after a piece leaves the board, so display code (score, snapshots) never needs to touch the live board/pieces. */
+    public List<CaptureRecord> getCaptureLog() {
+        return (arbiter != null) ? arbiter.getCaptureLog() : Collections.emptyList();
     }
 
     public Optional<Piece> pieceAt(Position pos) {
@@ -127,20 +76,6 @@ public class GameEngine {
             return Optional.empty();
         }
         return Optional.ofNullable(state.getBoard().getPieceAt(pos));
-    }
-
-    public boolean isPieceBusy(int pieceId) {
-        for (PendingMove move : getPendingMoves()) {
-            if (move.getPiece() != null && move.getPiece().getId() == pieceId) {
-                return true;
-            }
-        }
-        for (PendingJump jump : getPendingJumps()) {
-            if (jump.getPiece() != null && jump.getPiece().getId() == pieceId) {
-                return true;
-            }
-        }
-        return false;
     }
 
     public void handleRawWait(String[] parts) {
@@ -160,18 +95,8 @@ public class GameEngine {
         if (state.isGameOver()) return GameResult.fail("Game is over");
         if (from == null || to == null) return GameResult.fail("Invalid move positions");
 
-        Piece movingPiece = state.getBoard().getPieceAt(from);
-        
-        if (movingPiece != null) {
-            for (PendingJump jump : getPendingJumps()) {
-                if (jump.getRow() == to.getRow() && jump.getCol() == to.getCol()) {
-                    if (jump.getPiece() != null && jump.getPiece().getColor() == movingPiece.getColor()) {
-                        return GameResult.fail("Destination reserved by friendly airborne piece");
-                    }
-                }
-            }
-        }
-
+        // Note: "friendly piece already reserves destination via a pending jump" is validated
+        // by ruleEngine.validateMove below - no need to duplicate that check here.
         GameResult<Void> validation = ruleEngine.validateMove(
                 state.getBoard(),
                 from,

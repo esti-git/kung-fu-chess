@@ -29,4 +29,7 @@ public abstract class Piece {
 
     public abstract String getRepresentation();
     public abstract boolean isMovementPatternLegal(int fromRow, int fromCol, int toRow, int toCol, int totalRows);
+
+    /** True for pieces that must have every intervening square clear along their path (rook/bishop/queen). */
+    public boolean isSlidingPiece() { return false; }
 }

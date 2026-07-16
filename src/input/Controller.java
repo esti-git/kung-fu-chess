@@ -1,7 +1,7 @@
 package input;
 
 import engine.GameEngine;
-import engine.GameResult;
+import common.GameResult;
 import view.BoardPrinter;
 import model.Piece;
 import model.Position;

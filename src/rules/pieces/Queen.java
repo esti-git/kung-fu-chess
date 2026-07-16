@@ -17,4 +17,6 @@ public class Queen extends Piece {
         int deltaCol = Math.abs(toCol - fromCol);
         return (fromRow == toRow || fromCol == toCol) || (deltaRow == deltaCol);
     }
+
+    @Override public boolean isSlidingPiece() { return true; }
 }

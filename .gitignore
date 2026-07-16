@@ -28,3 +28,10 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+# התעלמות מכל קובצי ה-class המקומפלים
+*.class
+
+# התעלמות מכל תיקיית הפלט של המהדר (כמו target של Maven)
+target/
+bin/

@@ -36,6 +36,7 @@ public class BoardPrinter {
     private static final int RESTART_DELAY_MS = 3000; // כמה זמן להציג GAME OVER לפני שמתחיל משחק חדש
 
     private final BoardRenderer renderer;
+    private final BoardSnapshotFactory snapshotFactory;
     private final MoveHistoryTracker historyTracker;
     private final ScoreTracker scoreTracker;
     private GameEngine engine;
@@ -62,6 +63,7 @@ public class BoardPrinter {
 
     public BoardPrinter() {
         this.renderer = new BoardRenderer();
+        this.snapshotFactory = new BoardSnapshotFactory();
         this.historyTracker = new MoveHistoryTracker();
         this.scoreTracker = new ScoreTracker();
     }
@@ -105,7 +107,7 @@ public class BoardPrinter {
     // הדפסה טקסטואלית לקונסול - קוראת רק מתמונת מצב, לא מהלוח החי
     public void printConsole() {
         if (engine == null) return;
-        BoardSnapshot snapshot = engine.captureSnapshot();
+        BoardSnapshot snapshot = snapshotFactory.capture(engine);
         for (int i = 0; i < snapshot.getRows(); i++) {
             StringBuilder rowStr = new StringBuilder();
             for (int j = 0; j < snapshot.getCols(); j++) {
@@ -136,7 +138,7 @@ public class BoardPrinter {
             guiWindow = new JFrame("Kung Fu Chess");
             guiWindow.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-            BoardSnapshot snapshot = engine.captureSnapshot();
+            BoardSnapshot snapshot = snapshotFactory.capture(engine);
             Img visualBoard = renderer.render(snapshot, (controller != null) ? controller.selectedPosition() : null);
 
             boardPanel = new ScaledImagePanel();
@@ -273,7 +275,7 @@ public class BoardPrinter {
     private void updateGUIImage() {
         SwingUtilities.invokeLater(() -> {
             if (engine == null || boardPanel == null) return;
-            BoardSnapshot snapshot = engine.captureSnapshot();
+            BoardSnapshot snapshot = snapshotFactory.capture(engine);
             Img visualBoard = renderer.render(snapshot, (controller != null) ? controller.selectedPosition() : null);
             if (engine.isGameOver()) {
                 drawGameOverOverlay(visualBoard.get());
@@ -364,7 +366,7 @@ public class BoardPrinter {
     private void startHistoryLoop() {
         historyTimer = new Timer(HISTORY_POLL_MS, e -> {
             if (engine == null) return;
-            BoardSnapshot snapshot = engine.captureSnapshot();
+            BoardSnapshot snapshot = snapshotFactory.capture(engine);
             historyTracker.poll(snapshot);
             scoreTracker.poll(snapshot);
             updateHistoryPanels();

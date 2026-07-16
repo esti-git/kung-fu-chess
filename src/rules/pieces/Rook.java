@@ -15,4 +15,6 @@ public class Rook extends Piece {
     public boolean isMovementPatternLegal(int fromRow, int fromCol, int toRow, int toCol, int totalRows) {
         return fromRow == toRow || fromCol == toCol;
     }
+
+    @Override public boolean isSlidingPiece() { return true; }
 }

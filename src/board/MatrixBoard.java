@@ -47,19 +47,6 @@ public void clearCellOnly(Position position) {
 }
 
     @Override
-    public void movePiece(Position source, Position destination) {
-        requireValid(source);
-        requireValid(destination);
-        Piece movingPiece = getPieceAt(source);
-        if (movingPiece == null) {
-            throw new IllegalStateException("Empty source at: " + source);
-        }
-        matrix[source.getRow()][source.getCol()] = null;
-        matrix[destination.getRow()][destination.getCol()] = movingPiece;
-        movingPiece.setCell(destination);
-    }
-
-    @Override
     public Piece removePiece(Position pos) {
         requireValid(pos);
         Piece removed = getPieceAt(pos);

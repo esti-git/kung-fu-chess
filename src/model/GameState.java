@@ -19,8 +19,4 @@ public class GameState {
     public void setGameOver(boolean gameOver) {
         this.gameOver = gameOver;
     }
-    
-    public void endGame() {
-        this.gameOver = true;
-    }
 }

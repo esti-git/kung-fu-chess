@@ -1,4 +1,4 @@
-package engine;
+package common;
 
 public class GameResult<T> {
     private final boolean isSuccess;

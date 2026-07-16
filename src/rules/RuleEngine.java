@@ -1,6 +1,6 @@
 package rules;
 
-import engine.GameResult;
+import common.GameResult;
 import model.Board;
 import model.Piece;
 import model.PendingJump;
@@ -64,15 +64,14 @@ public class RuleEngine {
             return GameResult.fail("Movement pattern is illegal");
         }
 
-        enums.PieceKind pieceKind = movingPiece.getKind();
-        if (pieceKind == enums.PieceKind.ROOK || pieceKind == enums.PieceKind.BISHOP || pieceKind == enums.PieceKind.QUEEN) {
+        if (movingPiece.isSlidingPiece()) {
             if (!isPathClear(board, fromRow, fromCol, toRow, toCol, pendingMoves)) {
                 return GameResult.fail("Path is blocked");
             }
             return GameResult.success();
         }
 
-        if (pieceKind == enums.PieceKind.PAWN) {
+        if (movingPiece.getKind() == enums.PieceKind.PAWN) {
             int deltaCol = Math.abs(toCol - fromCol);
             int expectedRowDirection = (movingColor == enums.PieceColor.WHITE) ? -1 : 1;
             int actualRowDirection = toRow - fromRow;
