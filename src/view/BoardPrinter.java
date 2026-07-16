@@ -14,7 +14,10 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Insets;
+import java.awt.Point;
 import java.awt.RenderingHints;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -22,6 +25,7 @@ import java.awt.image.BufferedImage;
 public class BoardPrinter {
 
     private static final int HISTORY_PANEL_WIDTH = 190;
+    private static final Color FRAME_BACKGROUND = new Color(22, 22, 26); // תואם לצבע המסגרת מ-BoardRenderer, כדי שרצועות ה-letterbox סביב הלוח המוקטן לא יבלטו
     private static final Color PANEL_BACKGROUND = new Color(26, 26, 30); // כהה, תואם למסגרת הכהה של הלוח
     private static final Color PANEL_ACCENT = new Color(191, 155, 87); // אותו זהב/ברונזה כמו מסגרת הלוח - מאחד את העיצוב
     private static final Color PANEL_TEXT = new Color(225, 222, 215);
@@ -40,11 +44,17 @@ public class BoardPrinter {
     private Runnable restartAction;
 
     private JFrame guiWindow;
-    private JLabel imageLabel;
+    private ScaledImagePanel boardPanel;
+    private JPanel westPanel;
+    private JPanel eastPanel;
+    private TitledBorder whiteBorder;
+    private TitledBorder blackBorder;
     private JTextArea whiteMovesArea;
     private JTextArea blackMovesArea;
     private JLabel whiteScoreLabel;
     private JLabel blackScoreLabel;
+    private int baselineWidth;
+    private int baselineHeight;
     private Timer gameLoopTimer; // טיימר לניהול קצב המשחק בזמן אמת
     private Timer historyTimer; // טיימר נפרד ואיטי - "צופה מהצד" על שינויים בלוח, לא מחובר לקוד ביצוע המהלכים/התפיסות
     private long lastSystemTime; // מעקב אחר הזמן האמיתי של המחשב
@@ -129,40 +139,91 @@ public class BoardPrinter {
             BoardSnapshot snapshot = engine.captureSnapshot();
             Img visualBoard = renderer.render(snapshot, (controller != null) ? controller.selectedPosition() : null);
 
-            imageLabel = new JLabel(new ImageIcon(visualBoard.get()));
+            boardPanel = new ScaledImagePanel();
+            boardPanel.setImage(visualBoard.get());
+            boardPanel.setBackground(FRAME_BACKGROUND);
 
-            int boardHeight = visualBoard.get().getHeight();
             whiteMovesArea = createMovesArea();
             blackMovesArea = createMovesArea();
             whiteScoreLabel = createScoreLabel();
             blackScoreLabel = createScoreLabel();
+            whiteBorder = createTitledBorder("לבן");
+            blackBorder = createTitledBorder("שחור");
 
-            guiWindow.add(buildSidePanel("לבן", whiteMovesArea, whiteScoreLabel, boardHeight), BorderLayout.WEST);
-            guiWindow.add(imageLabel, BorderLayout.CENTER);
-            guiWindow.add(buildSidePanel("שחור", blackMovesArea, blackScoreLabel, boardHeight), BorderLayout.EAST);
+            westPanel = buildSidePanel(whiteBorder, whiteMovesArea, whiteScoreLabel);
+            eastPanel = buildSidePanel(blackBorder, blackMovesArea, blackScoreLabel);
 
-            // מאזין עכבר לשליחת לחיצות
-            imageLabel.addMouseListener(new MouseAdapter() {
+            guiWindow.add(westPanel, BorderLayout.WEST);
+            guiWindow.add(boardPanel, BorderLayout.CENTER);
+            guiWindow.add(eastPanel, BorderLayout.EAST);
+
+            // מאזין עכבר לשליחת לחיצות - ממיר קודם את קואורדינטות הלחיצה (במרחב הפאנל המוקטן/מוגדל)
+            // בחזרה לקואורדינטות המקוריות של תמונת הלוח, כדי שמיפוי המשבצות ימשיך לעבוד נכון בכל גודל חלון
+            boardPanel.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
-                    if (registry != null) {
-                        // דאבל קליק על משבצת מפעיל קפיצה, קליק בודד מפעיל בחירה/תנועה רגילה
-                        String commandType = (e.getClickCount() >= 2) ? "jump" : "click";
-                        String[] commandParts = {
-                            commandType,
-                            String.valueOf(e.getX()),
-                            String.valueOf(e.getY())
-                        };
-                        registry.dispatch(commandType, commandParts);
-                        System.out.println("Mouse " + commandType + " detected at Pixel: (" + e.getX() + ", " + e.getY() + ")");
-                    }
+                    if (registry == null) return;
+                    Point imagePoint = boardPanel.panelToImage(e.getX(), e.getY());
+                    if (imagePoint == null) return; // הלחיצה נפלה מחוץ לתמונת הלוח (באזור ה-letterbox)
+
+                    // דאבל קליק על משבצת מפעיל קפיצה, קליק בודד מפעיל בחירה/תנועה רגילה
+                    String commandType = (e.getClickCount() >= 2) ? "jump" : "click";
+                    String[] commandParts = {
+                        commandType,
+                        String.valueOf(imagePoint.x),
+                        String.valueOf(imagePoint.y)
+                    };
+                    registry.dispatch(commandType, commandParts);
+                    System.out.println("Mouse " + commandType + " detected at Pixel: (" + imagePoint.x + ", " + imagePoint.y + ")");
                 }
             });
 
             guiWindow.pack();
+            guiWindow.setMinimumSize(new Dimension(500, 400));
             guiWindow.setLocationRelativeTo(null);
+
+            baselineWidth = guiWindow.getWidth();
+            baselineHeight = guiWindow.getHeight();
+            guiWindow.addComponentListener(new ComponentAdapter() {
+                @Override
+                public void componentResized(ComponentEvent e) {
+                    rescaleSidePanels();
+                }
+            });
+
             guiWindow.setVisible(true);
         });
+    }
+
+    /**
+     * כשהחלון משנה גודל, מקטין/מגדיל את רוחב פאנלי הצדדים ואת גודל הגופנים שלהם
+     * באותו יחס שבו החלון עצמו השתנה - כך שהלוח (שמתאים עצמו אוטומטית לשטח שנשאר) ורשימות
+     * המהלכים/הניקוד גדלים ומצטמצמים יחד, ושום דבר לא נחתך.
+     */
+    private void rescaleSidePanels() {
+        if (baselineWidth <= 0 || baselineHeight <= 0 || westPanel == null || eastPanel == null) return;
+
+        double scaleX = guiWindow.getWidth() / (double) baselineWidth;
+        double scaleY = guiWindow.getHeight() / (double) baselineHeight;
+        double scale = Math.max(0.5, Math.min(2.5, Math.min(scaleX, scaleY)));
+
+        int panelWidth = Math.max(90, (int) Math.round(HISTORY_PANEL_WIDTH * scale));
+        westPanel.setPreferredSize(new Dimension(panelWidth, 10));
+        eastPanel.setPreferredSize(new Dimension(panelWidth, 10));
+
+        float movesFontSize = (float) Math.max(9.0, MOVES_FONT.getSize() * scale);
+        float scoreFontSize = (float) Math.max(11.0, SCORE_FONT.getSize() * scale);
+        float titleFontSize = (float) Math.max(10.0, TITLE_FONT.getSize() * scale);
+
+        whiteMovesArea.setFont(MOVES_FONT.deriveFont(movesFontSize));
+        blackMovesArea.setFont(MOVES_FONT.deriveFont(movesFontSize));
+        whiteScoreLabel.setFont(SCORE_FONT.deriveFont(scoreFontSize));
+        blackScoreLabel.setFont(SCORE_FONT.deriveFont(scoreFontSize));
+        whiteBorder.setTitleFont(TITLE_FONT.deriveFont(titleFontSize));
+        blackBorder.setTitleFont(TITLE_FONT.deriveFont(titleFontSize));
+
+        guiWindow.revalidate();
+        guiWindow.repaint();
     }
 
     private JTextArea createMovesArea() {
@@ -187,15 +248,18 @@ public class BoardPrinter {
         return label;
     }
 
-    private JPanel buildSidePanel(String title, JTextArea movesArea, JLabel scoreLabel, int boardHeight) {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setPreferredSize(new Dimension(HISTORY_PANEL_WIDTH, boardHeight));
-        panel.setBackground(PANEL_BACKGROUND);
-
+    private TitledBorder createTitledBorder(String title) {
         TitledBorder titledBorder = BorderFactory.createTitledBorder(
                 BorderFactory.createLineBorder(PANEL_ACCENT, 2), title);
         titledBorder.setTitleFont(TITLE_FONT);
         titledBorder.setTitleColor(PANEL_ACCENT);
+        return titledBorder;
+    }
+
+    private JPanel buildSidePanel(TitledBorder titledBorder, JTextArea movesArea, JLabel scoreLabel) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setPreferredSize(new Dimension(HISTORY_PANEL_WIDTH, 10));
+        panel.setBackground(PANEL_BACKGROUND);
         panel.setBorder(titledBorder);
 
         JScrollPane scrollPane = new JScrollPane(movesArea);
@@ -208,14 +272,14 @@ public class BoardPrinter {
 
     private void updateGUIImage() {
         SwingUtilities.invokeLater(() -> {
-            if (engine == null || imageLabel == null) return;
+            if (engine == null || boardPanel == null) return;
             BoardSnapshot snapshot = engine.captureSnapshot();
             Img visualBoard = renderer.render(snapshot, (controller != null) ? controller.selectedPosition() : null);
             if (engine.isGameOver()) {
                 drawGameOverOverlay(visualBoard.get());
             }
-            imageLabel.setIcon(new ImageIcon(visualBoard.get()));
-            guiWindow.repaint();
+            boardPanel.setImage(visualBoard.get());
+            boardPanel.repaint();
         });
     }
 
