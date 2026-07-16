@@ -97,6 +97,7 @@ public class BoardRenderer {
 
     private static final Color FRAME_COLOR = new Color(22, 22, 26);
     private static final Color FRAME_ACCENT = new Color(191, 155, 87); // זהב/ברונזה עדין - נותן מראה "פרימיום" על רקע כהה
+    private static final Color BRIGHT_GOLD = new Color(255, 200, 60); // אותו גוון זהב, אבל בהיר ורווי הרבה יותר - כדי שיהיה בולט לעין על גבי הלוח
 
     /**
      * פונקציית הגנה שמוודאת של-Img יש BufferedImage תקני ולא null, וצובעת מסביב מסגרת כהה עם קו הבהקה זהוב
@@ -196,7 +197,7 @@ public class BoardRenderer {
         g.dispose();
     }
 
-    private static final Color REST_TINT = new Color(255, 196, 0);
+    private static final Color REST_TINT = BRIGHT_GOLD;
 
     /**
      * מציג את הזמן שנותר במנוחה כמלבן מלא-צבע שגובהו קטן בהדרגה (כמו מד שמתרוקן כלפי מטה),
@@ -241,7 +242,7 @@ public class BoardRenderer {
         g.dispose();
     }
 
-    private static final Color SELECTION_BORDER = new Color(255, 255, 0);
+    private static final Color SELECTION_BORDER = BRIGHT_GOLD;
     private static final int SELECTION_BORDER_WIDTH = 4;
 
     private void drawSelectionHighlight(Img canvas, model.Position selectedPosition) {
