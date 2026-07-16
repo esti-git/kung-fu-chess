@@ -1,17 +1,22 @@
 package realTime;
 
 import config.GameConfig;
+import enums.PieceColor;
 import enums.PieceKind;
 import enums.PieceState;
 import model.Board;
+import model.CaptureRecord;
 import model.Piece;
 import model.PendingJump;
 import model.PendingMove;
+import model.PendingRest;
 import model.Position;
 import rules.PawnPromotion;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -19,7 +24,10 @@ public class RealTimeArbiter {
     private final Board board;
     private final List<PendingMove> activeMoves = new ArrayList<>();
     private final List<PendingJump> activeJumps = new ArrayList<>();
+    private final List<PendingRest> activeRests = new ArrayList<>();
+    private final List<CaptureRecord> captureLog = new ArrayList<>();
     private long currentTimeMillis;
+    private PieceColor winnerColor;
 
     public RealTimeArbiter(Board board) {
         this.board = board;
@@ -37,6 +45,33 @@ public class RealTimeArbiter {
         return activeJumps;
     }
 
+    public List<PendingRest> getActiveRests() {
+        return activeRests;
+    }
+
+    public PieceColor getWinnerColor() {
+        return winnerColor;
+    }
+
+    /** יומן תפיסות מצטבר - נשמר גם אחרי שכלי כבר לא בלוח, כדי שהצופה בניקוד לא יצטרך לגעת בלוח/בכלים חיים */
+    public List<CaptureRecord> getCaptureLog() {
+        return Collections.unmodifiableList(captureLog);
+    }
+
+    /** מנקה תנועות/קפיצות/מנוחות/יומן תפיסות פעילים - לשימוש כשמתחילים משחק חדש על אותו לוח */
+    public void reset() {
+        activeMoves.clear();
+        activeJumps.clear();
+        activeRests.clear();
+        captureLog.clear();
+        winnerColor = null;
+    }
+
+    private void beginRest(Piece piece, PieceState restState, long durationMs) {
+        piece.setState(restState);
+        activeRests.add(new PendingRest(piece, currentTimeMillis + durationMs));
+    }
+
     public void startMove(Piece piece, Position source, Position destination) {
         int distance = Math.max(
                 Math.abs(destination.getRow() - source.getRow()),
@@ -52,15 +87,15 @@ public class RealTimeArbiter {
                 arrivalTime
         ));
         piece.setState(PieceState.MOVING);
+
+        if (board.getPieceAt(source) == piece) {
+            board.clearCellOnly(source);
+        }
     }
 
     public void startJump(Piece piece, Position position) {
         activeJumps.add(new PendingJump(position.getRow(), position.getCol(), piece, currentTimeMillis));
-        piece.setState(PieceState.MOVING);
-        
-        if (board.getPieceAt(position) == piece) {
-            board.setPieceAt(position, null);
-        }
+        piece.setState(PieceState.JUMPING);
     }
 
     public boolean advance(long milliseconds) {
@@ -105,6 +140,17 @@ public class RealTimeArbiter {
         activeMoves.removeIf(m -> m.getPiece().getState() == PieceState.CAPTURED);
         activeJumps.removeIf(j -> j.getPiece().getState() == PieceState.CAPTURED);
 
+        Iterator<PendingRest> restIterator = activeRests.iterator();
+        while (restIterator.hasNext()) {
+            PendingRest rest = restIterator.next();
+            if (rest.getPiece().getState() == PieceState.CAPTURED) {
+                restIterator.remove();
+            } else if (rest.getEndTime() <= currentTimeMillis) {
+                rest.getPiece().setState(PieceState.IDLE);
+                restIterator.remove();
+            }
+        }
+
         return kingCaptured;
     }
 
@@ -115,27 +161,31 @@ public class RealTimeArbiter {
         Position source = new Position(move.getFromRow(), move.getFromCol());
         Position destination = new Position(move.getToRow(), move.getToCol());
 
-        if (board.getPieceAt(source) == movingPiece) {
-            board.setPieceAt(source, null);
-        }
-
         Piece target = board.getPieceAt(destination);
         if (target != null && target.getColor() == movingPiece.getColor()) {
-            movingPiece.setState(PieceState.IDLE);
-            board.setPieceAt(source, movingPiece);
+            board.addPiece(source, movingPiece);
+            beginRest(movingPiece, PieceState.LONG_REST, GameConfig.LONG_REST_DURATION_MS);
             return false;
         }
 
         boolean kingCaptured = false;
         if (target != null) {
-            target.setState(PieceState.CAPTURED);
-            if (target.getKind() == PieceKind.KING) kingCaptured = true;
+            if (target.getState() == PieceState.JUMPING) {
+                // הכלי באוויר - לא נתפס עכשיו, רק מתפנה מהמשבצת עד שינחת; הוא זה שיתפוס את מי שינחת עליו
+                board.clearCellOnly(destination);
+            } else {
+                board.removePiece(destination);
+                captureLog.add(new CaptureRecord(target.getColor(), target.getKind()));
+                if (target.getKind() == PieceKind.KING) {
+                    kingCaptured = true;
+                    winnerColor = movingPiece.getColor();
+                }
+            }
         }
 
         Piece promotedPiece = PawnPromotion.applyPromotion(movingPiece, destination.getRow(), board.getRows());
-        board.setPieceAt(destination, promotedPiece);
-        promotedPiece.setCell(destination);
-        promotedPiece.setState(PieceState.IDLE);
+        board.addPiece(destination, promotedPiece);
+        beginRest(promotedPiece, PieceState.LONG_REST, GameConfig.LONG_REST_DURATION_MS);
 
         return kingCaptured;
     }
@@ -148,22 +198,33 @@ public class RealTimeArbiter {
         Piece existingPiece = board.getPieceAt(jumpPosition);
 
         boolean kingCaptured = false;
+
         if (existingPiece == null) {
-            board.setPieceAt(jumpPosition, piece);
-            piece.setCell(jumpPosition);
-            piece.setState(PieceState.IDLE);
+            board.addPiece(jumpPosition, piece);
+        } else if (existingPiece == piece) {
+            // הכלי לא הוסר מהלוח בזמן הקפיצה, אז הוא כבר נמצא במקום הנחיתה
         } else if (existingPiece.getColor() != piece.getColor()) {
-            existingPiece.setState(PieceState.CAPTURED);
-            if (existingPiece.getKind() == PieceKind.KING) kingCaptured = true;
-            
-            board.setPieceAt(jumpPosition, piece);
-            piece.setCell(jumpPosition);
-            piece.setState(PieceState.IDLE);
+            board.removePiece(jumpPosition);
+            captureLog.add(new CaptureRecord(existingPiece.getColor(), existingPiece.getKind()));
+            if (existingPiece.getKind() == PieceKind.KING) {
+                kingCaptured = true;
+                winnerColor = piece.getColor();
+            }
+
+            board.addPiece(jumpPosition, piece);
         } else {
-            board.setPieceAt(jumpPosition, piece);
-            piece.setCell(jumpPosition);
-            piece.setState(PieceState.IDLE);
+            Position originalPos = piece.getCell();
+            if (originalPos != null && board.getPieceAt(originalPos) == null) {
+                board.addPiece(originalPos, piece);
+            } else {
+                Position backup = new Position(jump.getRow(), jump.getCol());
+                if (board.getPieceAt(backup) == null) {
+                    board.addPiece(backup, piece);
+                }
+            }
         }
+
+        beginRest(piece, PieceState.SHORT_REST, GameConfig.SHORT_REST_DURATION_MS);
         return kingCaptured;
     }
 

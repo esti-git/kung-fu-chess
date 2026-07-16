@@ -2,6 +2,7 @@ package input;
 
 import engine.GameEngine;
 import engine.GameResult;
+import view.BoardPrinter;
 import model.Piece;
 import model.Position;
 
@@ -9,11 +10,13 @@ public class Controller {
 
     private final GameEngine engine;
     private final BoardMapper boardMapper;
+    private final BoardPrinter printer;
     private Position selectedPosition;
 
-    public Controller(GameEngine engine, BoardMapper boardMapper) {
+    public Controller(GameEngine engine, BoardMapper boardMapper, BoardPrinter printer) {
         this.engine = engine;
         this.boardMapper = boardMapper;
+        this.printer = printer;
         this.selectedPosition = null;
     }
 
@@ -39,11 +42,13 @@ public class Controller {
         boardMapper.pixelToCell(x, y).ifPresent(position -> {
             if (selectedPosition == null) {
                 trySelect(position);
+                printer.printGUI(); // מרענן את המסך כדי לשמור על הבחירה הראשונה
                 return;
             }
 
             if (selectedPosition.equals(position)) {
                 clearSelection();
+                printer.printGUI(); // מרענן את המסך לאחר ביטול בחירה
                 return;
             }
 
@@ -52,13 +57,14 @@ public class Controller {
 
             if (selectedPiece != null && clickedPiece != null && selectedPiece.getColor() == clickedPiece.getColor()) {
                 trySelect(position);
+                printer.printGUI(); // מרענן את המסך כשמחליפים בחירה בין כלים מאותו צבע
                 return;
             }
 
-            GameResult<Void> moveResult = engine.requestMove(selectedPosition, position);
-            if (moveResult.isSuccess()) {
-                clearSelection();
-            }
+            engine.requestMove(selectedPosition, position);
+            // בין אם המהלך הצליח ובין אם לא (למשל לחיצה על משבצת שהחייל לא יכול להגיע אליה) - מבטלים את הבחירה
+            clearSelection();
+            printer.printGUI();
         });
     }
 
@@ -67,6 +73,7 @@ public class Controller {
             GameResult<Void> jumpResult = engine.requestJump(position);
             if (jumpResult.isSuccess()) {
                 clearSelection();
+                printer.printGUI(); // מרענן את הלוח לאחר קפיצה מוצלחת
             }
         });
     }
@@ -78,7 +85,7 @@ public class Controller {
         }
 
         engine.pieceAt(position).ifPresentOrElse(piece -> {
-            if (!engine.isPieceBusy(piece.getId())) {
+            if (piece.getState() == enums.PieceState.IDLE) {
                 selectedPosition = position;
             } else {
                 clearSelection();

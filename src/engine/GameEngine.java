@@ -1,12 +1,22 @@
 package engine;
 
 import config.GameConfig;
+import enums.PieceColor;
+import model.Board;
+import model.CaptureRecord;
 import model.GameState;
 import model.Piece;
 import model.PendingJump;
 import model.PendingMove;
+import model.PendingRest;
 import model.Position;
 import rules.RuleEngine;
+import view.BoardSnapshot;
+import view.CaptureSnapshot;
+import view.PendingJumpSnapshot;
+import view.PendingMoveSnapshot;
+import view.PendingRestSnapshot;
+import view.PieceSnapshot;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +39,10 @@ public class GameEngine {
 
     public boolean isGameOver() { return state.isGameOver(); }
     public void setGameOver(boolean value) { state.setGameOver(value); }
+
+    public PieceColor getWinnerColor() {
+        return (arbiter != null) ? arbiter.getWinnerColor() : null;
+    }
     
     public long getGameClock() {
         return (arbiter != null) ? arbiter.getCurrentTimeMillis() : 0L;
@@ -51,6 +65,61 @@ public class GameEngine {
     
     public List<PendingJump> getPendingJumps() {
         return (arbiter != null) ? arbiter.getActiveJumps() : new ArrayList<>();
+    }
+
+    public List<PendingRest> getPendingRests() {
+        return (arbiter != null) ? arbiter.getActiveRests() : new ArrayList<>();
+    }
+
+    /**
+     * בונה תמונת מצב קפואה של הלוח והפעולות הפעילות - זה היחיד שקורא ל-board.getPieceAt(...) לצורך התצוגה;
+     * כל שאר קוד התצוגה (renderer, היסטוריית מהלכים, ניקוד) קורא רק מהתמונה הזו, לא מהלוח החי.
+     */
+    public BoardSnapshot captureSnapshot() {
+        Board board = state.getBoard();
+        int rows = board.getRows();
+        int cols = board.getCols();
+
+        PieceSnapshot[][] cells = new PieceSnapshot[rows][cols];
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                Piece piece = board.getPieceAt(new Position(r, c));
+                if (piece != null) {
+                    cells[r][c] = toSnapshot(piece);
+                }
+            }
+        }
+
+        List<PendingMoveSnapshot> moveSnapshots = new ArrayList<>();
+        for (PendingMove move : getPendingMoves()) {
+            moveSnapshots.add(new PendingMoveSnapshot(
+                    move.getFromRow(), move.getFromCol(), move.getToRow(), move.getToCol(),
+                    toSnapshot(move.getPiece()), move.getArrivalTime()));
+        }
+
+        List<PendingJumpSnapshot> jumpSnapshots = new ArrayList<>();
+        for (PendingJump jump : getPendingJumps()) {
+            jumpSnapshots.add(new PendingJumpSnapshot(
+                    jump.getRow(), jump.getCol(), toSnapshot(jump.getPiece()), jump.getStartTime(), jump.getEndTime()));
+        }
+
+        List<PendingRestSnapshot> restSnapshots = new ArrayList<>();
+        for (PendingRest rest : getPendingRests()) {
+            restSnapshots.add(new PendingRestSnapshot(toSnapshot(rest.getPiece()), rest.getEndTime()));
+        }
+
+        List<CaptureSnapshot> captureSnapshots = new ArrayList<>();
+        if (arbiter != null) {
+            for (CaptureRecord record : arbiter.getCaptureLog()) {
+                captureSnapshots.add(new CaptureSnapshot(record.getCapturedColor(), record.getCapturedKind()));
+            }
+        }
+
+        return new BoardSnapshot(rows, cols, cells, moveSnapshots, jumpSnapshots, restSnapshots, captureSnapshots, getGameClock());
+    }
+
+    private PieceSnapshot toSnapshot(Piece piece) {
+        return new PieceSnapshot(piece.getId(), piece.getColor(), piece.getKind(), piece.getRepresentation(), piece.getState());
     }
 
     public Optional<Piece> pieceAt(Position pos) {
@@ -116,22 +185,24 @@ public class GameEngine {
         return GameResult.success();
     }
 
-    public GameResult<Void> requestJump(Position pos) {
-        if (state.isGameOver()) return GameResult.fail("Game is over");
-        if (pos == null || !state.getBoard().isValidPosition(pos)) return GameResult.fail("Invalid jump position");
+public GameResult<Void> requestJump(Position pos) {
+    if (state.isGameOver()) return GameResult.fail("Game is over");
+    if (pos == null || !state.getBoard().isValidPosition(pos)) return GameResult.fail("Invalid jump position");
 
-        Piece currentPiece = state.getBoard().getPieceAt(pos);
-        if (currentPiece == null) return GameResult.fail("No piece at jump position");
-        if (!canPieceJump(pos.getRow(), pos.getCol())) return GameResult.fail("Jump is not currently possible");
+    Piece currentPiece = state.getBoard().getPieceAt(pos);
+    if (currentPiece == null) return GameResult.fail("No piece at jump position");
+    if (currentPiece.getState() != enums.PieceState.IDLE) return GameResult.fail("Piece cannot act right now");
+    if (!canPieceJump(pos.getRow(), pos.getCol())) return GameResult.fail("Jump is not currently possible");
 
-        if (arbiter != null) {
-            arbiter.startJump(currentPiece, pos);
-        } else {
-            getPendingJumps().add(new PendingJump(pos.getRow(), pos.getCol(), currentPiece, getGameClock()));
-        }
-        state.getBoard().setPieceAt(pos, null);
-        return GameResult.success();
+    if (arbiter != null) {
+        arbiter.startJump(currentPiece, pos);
+    } else {
+        getPendingJumps().add(new PendingJump(pos.getRow(), pos.getCol(), currentPiece, getGameClock()));
+        currentPiece.setState(enums.PieceState.JUMPING);
     }
+
+    return GameResult.success();
+}
 
     public boolean canExecuteCommand(String commandType) {
         if (!isGameOver()) return true;
