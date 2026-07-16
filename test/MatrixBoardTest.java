@@ -1,6 +1,7 @@
 import board.MatrixBoard;
 import enums.PieceColor;
 import enums.PieceKind;
+import enums.PieceState;
 import io.BoardParser;
 import model.Piece;
 import model.Position;
@@ -8,7 +9,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import rules.pieces.Queen;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -42,6 +45,12 @@ class MatrixBoardTest {
     }
 
     @Test
+    void testPieceCellIsSetOnInitialize() {
+        Piece rook = board.getPieceAt(new Position(0, 0));
+        assertEquals(new Position(0, 0), rook.getCell());
+    }
+
+    @Test
     void testEmptyCell() {
         assertTrue(board.isEmpty(new Position(0, 1)));
         assertNull(board.getPieceAt(new Position(0, 1)));
@@ -49,31 +58,65 @@ class MatrixBoardTest {
 
     @Test
     void testGetPieceAtOutOfBounds() {
-        assertNull(board.getPieceAt(new Position(-1, 0)));
-        assertNull(board.getPieceAt(new Position(5, 5)));
-        assertNull(board.getPieceAt(null));
+        assertThrows(IllegalArgumentException.class, () -> board.getPieceAt(new Position(-1, 0)));
+        assertThrows(IllegalArgumentException.class, () -> board.getPieceAt(new Position(5, 5)));
+        assertThrows(IllegalArgumentException.class, () -> board.getPieceAt(null));
     }
 
     @Test
     void testIsValidPosition() {
         assertTrue(board.isValidPosition(new Position(0, 0)));
+        assertTrue(board.isValidPosition(new Position(1, 2)));
         assertFalse(board.isValidPosition(new Position(-1, 0)));
+        assertFalse(board.isValidPosition(new Position(2, 0)));
+        assertFalse(board.isValidPosition(new Position(0, 3)));
         assertFalse(board.isValidPosition(new Position(5, 5)));
         assertFalse(board.isValidPosition(null));
     }
 
     @Test
-    void testSetPieceAt() {
+    void testAddPieceToEmptyCell() {
         Piece queen = new Queen(10, PieceColor.WHITE);
-        board.setPieceAt(new Position(0, 1), queen);
-        assertFalse(board.isEmpty(new Position(0, 1)));
-        assertEquals(PieceKind.QUEEN, board.getPieceAt(new Position(0, 1)).getKind());
+        Position dest = new Position(0, 1);
+        board.addPiece(dest, queen);
+        assertFalse(board.isEmpty(dest));
+        assertEquals(PieceKind.QUEEN, board.getPieceAt(dest).getKind());
+        assertEquals(dest, queen.getCell());
     }
 
     @Test
-    void testSetPieceAtNull() {
-        board.setPieceAt(new Position(0, 0), null);
-        assertTrue(board.isEmpty(new Position(0, 0)));
+    void testAddPieceToOccupiedCellThrows() {
+        Position occupied = new Position(0, 0);
+        assertThrows(IllegalStateException.class,
+                () -> board.addPiece(occupied, new Queen(11, PieceColor.WHITE)));
+    }
+
+    @Test
+    void testRemovePieceClearsCellAndMarksCaptured() {
+        Position source = new Position(0, 0);
+        Piece removed = board.removePiece(source);
+        assertNotNull(removed);
+        assertEquals(PieceState.CAPTURED, removed.getState());
+        assertTrue(board.isEmpty(source));
+    }
+
+    @Test
+    void testRemovePieceFromEmptyCellReturnsNull() {
+        assertNull(board.removePiece(new Position(0, 1)));
+    }
+
+    @Test
+    void testClearCellOnlyDoesNotChangePieceState() {
+        Position source = new Position(0, 0);
+        Piece rook = board.getPieceAt(source);
+        board.clearCellOnly(source);
+        assertTrue(board.isEmpty(source));
+        assertEquals(PieceState.IDLE, rook.getState());
+    }
+
+    @Test
+    void testParserEmptyInputReturnsNull() {
+        assertNull(parser.parse(Collections.emptyList()));
     }
 
     @Test
@@ -86,5 +129,20 @@ class MatrixBoardTest {
     void testParserInvalidToken() {
         List<String> rawLines = Arrays.asList("wR . bK", ". wX .");
         assertNull(parser.parse(rawLines));
+    }
+
+    @Test
+    void testParserAssignsSequentialIds() {
+        List<String> rawLines = Arrays.asList("wR . bK", ". wP .");
+        List<Piece> pieces = parser.parse(rawLines);
+        List<Integer> ids = new ArrayList<>();
+        for (Piece piece : pieces) ids.add(piece.getId());
+        assertEquals(Arrays.asList(0, 1, 2), ids);
+    }
+
+    @Test
+    void testParseRowsAndColsOnEmptyInput() {
+        assertEquals(0, parser.parseRows(Collections.emptyList()));
+        assertEquals(0, parser.parseCols(Collections.emptyList()));
     }
 }
