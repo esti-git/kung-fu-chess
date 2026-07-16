@@ -71,46 +71,9 @@ public class RuleEngine {
             return GameResult.success();
         }
 
-        if (movingPiece.getKind() == enums.PieceKind.PAWN) {
-            int deltaCol = Math.abs(toCol - fromCol);
-            int expectedRowDirection = (movingColor == enums.PieceColor.WHITE) ? -1 : 1;
-            int actualRowDirection = toRow - fromRow;
-
-            if (deltaCol == 0) {
-                if (actualRowDirection == expectedRowDirection) {
-                    if (!board.isEmpty(destination)) {
-                        return GameResult.fail("Forward move is blocked");
-                    }
-                    return GameResult.success();
-                }
-                if (actualRowDirection == expectedRowDirection * 2) {
-                    int startRow = (movingColor == enums.PieceColor.WHITE) ? (board.getRows() - 2) : 1;
-                    if (fromRow != startRow) {
-                        return GameResult.fail("Pawn can only move two steps from its starting row");
-                    }
-                    int middleRow = fromRow + expectedRowDirection;
-                    if (!board.isEmpty(new Position(middleRow, fromCol)) || !board.isEmpty(destination)) {
-                        return GameResult.fail("Pawn double-step path is blocked");
-                    }
-
-                    for (PendingMove move : pendingMoves) {
-                        if (move.getPiece().getId() == movingPiece.getId()) {
-                            continue;
-                        }
-                        if ((move.getToRow() == middleRow && move.getToCol() == fromCol) ||
-                                (move.getToRow() == toRow && move.getToCol() == toCol)) {
-                            return GameResult.fail("Pawn double-step path is blocked by a pending move");
-                        }
-                    }
-                    return GameResult.success();
-                }
-            }
-            if (deltaCol == 1) {
-                if (destinationPiece != null) {
-                    return GameResult.success();
-                }
-                return GameResult.fail("Pawn capture requires a target piece");
-            }
+        String specialFailure = movingPiece.validateSpecialMove(board, source, destination, destinationPiece, pendingMoves);
+        if (specialFailure != null) {
+            return GameResult.fail(specialFailure);
         }
 
         return GameResult.success();

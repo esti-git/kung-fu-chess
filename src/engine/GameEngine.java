@@ -30,19 +30,26 @@ public class GameEngine {
         this.ruleEngine = new RuleEngine();
     }
 
-    public GameState getState() { return state; }
+    public GameState getState() {
+        return state;
+    }
 
-    public boolean isGameOver() { return state.isGameOver(); }
-    public void setGameOver(boolean value) { state.setGameOver(value); }
+    public boolean isGameOver() {
+        return state.isGameOver();
+    }
+
+    public void setGameOver(boolean value) {
+        state.setGameOver(value);
+    }
 
     public PieceColor getWinnerColor() {
         return (arbiter != null) ? arbiter.getWinnerColor() : null;
     }
-    
+
     public long getGameClock() {
         return (arbiter != null) ? arbiter.getCurrentTimeMillis() : 0L;
     }
-    
+
     public void advanceClock(long ms) {
         if (arbiter != null) {
             boolean kingCaptured = arbiter.advance(ms);
@@ -51,13 +58,15 @@ public class GameEngine {
             }
         }
     }
-    
-    public void setArbiter(RealTimeArbiter arbiter) { this.arbiter = arbiter; }
+
+    public void setArbiter(RealTimeArbiter arbiter) {
+        this.arbiter = arbiter;
+    }
 
     public List<PendingMove> getPendingMoves() {
         return (arbiter != null) ? arbiter.getActiveMoves() : new ArrayList<>();
     }
-    
+
     public List<PendingJump> getPendingJumps() {
         return (arbiter != null) ? arbiter.getActiveJumps() : new ArrayList<>();
     }
@@ -66,7 +75,10 @@ public class GameEngine {
         return (arbiter != null) ? arbiter.getActiveRests() : new ArrayList<>();
     }
 
-    /** Cumulative capture log - kept even after a piece leaves the board, so display code (score, snapshots) never needs to touch the live board/pieces. */
+    /**
+     * Cumulative capture log - kept even after a piece leaves the board, so display
+     * code (score, snapshots) never needs to touch the live board/pieces.
+     */
     public List<CaptureRecord> getCaptureLog() {
         return (arbiter != null) ? arbiter.getCaptureLog() : Collections.emptyList();
     }
@@ -79,67 +91,81 @@ public class GameEngine {
     }
 
     public void handleRawWait(String[] parts) {
-        if (parts == null || parts.length < 2) return;
+        if (parts == null || parts.length < 2)
+            return;
         try {
             long milliseconds = Long.parseLong(parts[1]);
             waitMs(milliseconds);
-        } catch (NumberFormatException ignored) {}
+        } catch (NumberFormatException ignored) {
+        }
     }
 
     public void waitMs(long milliseconds) {
-        if (milliseconds < 0) return;
+        if (milliseconds < 0)
+            return;
         advanceClock(milliseconds);
     }
 
     public GameResult<Void> requestMove(Position from, Position to) {
-        if (state.isGameOver()) return GameResult.fail("Game is over");
-        if (from == null || to == null) return GameResult.fail("Invalid move positions");
+        if (state.isGameOver())
+            return GameResult.fail("Game is over");
+        if (from == null || to == null)
+            return GameResult.fail("Invalid move positions");
 
-        // Note: "friendly piece already reserves destination via a pending jump" is validated
+        // Note: "friendly piece already reserves destination via a pending jump" is
+        // validated
         // by ruleEngine.validateMove below - no need to duplicate that check here.
         GameResult<Void> validation = ruleEngine.validateMove(
                 state.getBoard(),
                 from,
                 to,
                 getPendingMoves(),
-                getPendingJumps()
-        );
-        if (!validation.isSuccess()) return validation;
+                getPendingJumps());
+        if (!validation.isSuccess())
+            return validation;
 
         executeMove(from.getRow(), from.getCol(), to.getRow(), to.getCol());
         return GameResult.success();
     }
 
-public GameResult<Void> requestJump(Position pos) {
-    if (state.isGameOver()) return GameResult.fail("Game is over");
-    if (pos == null || !state.getBoard().isValidPosition(pos)) return GameResult.fail("Invalid jump position");
+    public GameResult<Void> requestJump(Position pos) {
+        if (state.isGameOver())
+            return GameResult.fail("Game is over");
+        if (pos == null || !state.getBoard().isValidPosition(pos))
+            return GameResult.fail("Invalid jump position");
 
-    Piece currentPiece = state.getBoard().getPieceAt(pos);
-    if (currentPiece == null) return GameResult.fail("No piece at jump position");
-    if (currentPiece.getState() != enums.PieceState.IDLE) return GameResult.fail("Piece cannot act right now");
-    if (!canPieceJump(pos.getRow(), pos.getCol())) return GameResult.fail("Jump is not currently possible");
+        Piece currentPiece = state.getBoard().getPieceAt(pos);
+        if (currentPiece == null)
+            return GameResult.fail("No piece at jump position");
+        if (currentPiece.getState() != enums.PieceState.IDLE)
+            return GameResult.fail("Piece cannot act right now");
+        if (!canPieceJump(pos.getRow(), pos.getCol()))
+            return GameResult.fail("Jump is not currently possible");
 
-    if (arbiter != null) {
-        arbiter.startJump(currentPiece, pos);
-    } else {
-        getPendingJumps().add(new PendingJump(pos.getRow(), pos.getCol(), currentPiece, getGameClock()));
-        currentPiece.setState(enums.PieceState.JUMPING);
+        if (arbiter != null) {
+            arbiter.startJump(currentPiece, pos);
+        } else {
+            getPendingJumps().add(new PendingJump(pos.getRow(), pos.getCol(), currentPiece, getGameClock()));
+            currentPiece.setState(enums.PieceState.JUMPING);
+        }
+
+        return GameResult.success();
     }
 
-    return GameResult.success();
-}
-
     public boolean canExecuteCommand(String commandType) {
-        if (!isGameOver()) return true;
+        if (!isGameOver())
+            return true;
         return !commandType.equals("click") && !commandType.equals("wait") && !commandType.equals("jump");
     }
 
     public boolean canPieceJump(int r, int c) {
         for (PendingMove move : getPendingMoves()) {
-            if (move.getFromRow() == r && move.getFromCol() == c) return false;
+            if (move.getFromRow() == r && move.getFromCol() == c)
+                return false;
         }
         for (PendingJump jump : getPendingJumps()) {
-            if (jump.getRow() == r && jump.getCol() == c) return false;
+            if (jump.getRow() == r && jump.getCol() == c)
+                return false;
         }
         return true;
     }

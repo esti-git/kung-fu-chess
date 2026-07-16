@@ -5,6 +5,6 @@ public class GameConfig {
      public static final long MS_PER_CELL = 1000L;
     public static final long JUMP_DURATION_MS = 1000L;
     public static final long LONG_REST_DURATION_MS = 3000L;
-    public static final long SHORT_REST_DURATION_MS = 500L;
-    public static final int BOARD_LABEL_MARGIN = 30; // רצועת שוליים סביב הלוח לאותיות (a-h) ומספרים (1-8)
+    public static final long SHORT_REST_DURATION_MS = 1000L;
+    public static final int BOARD_LABEL_MARGIN = 30; 
 }

@@ -4,6 +4,8 @@ import enums.PieceColor;
 import enums.PieceKind;
 import enums.PieceState;
 
+import java.util.List;
+
 public abstract class Piece {
     private final int id;
     private final PieceColor color;
@@ -32,4 +34,15 @@ public abstract class Piece {
 
     /** True for pieces that must have every intervening square clear along their path (rook/bishop/queen). */
     public boolean isSlidingPiece() { return false; }
+
+    /**
+     * Extra validation beyond the geometric movement pattern, for pieces with rules that
+     * depend on board/pending-move state (e.g. pawn double-step path clearance and
+     * capture-only diagonals). Called only after {@link #isMovementPatternLegal} has passed.
+     *
+     * @return an error message if the move is illegal, or null if this piece has no objection.
+     */
+    public String validateSpecialMove(Board board, Position source, Position destination, Piece destinationPiece, List<PendingMove> pendingMoves) {
+        return null;
+    }
 }
