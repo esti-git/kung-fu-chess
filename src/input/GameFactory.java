@@ -83,6 +83,7 @@ this.controller = new Controller(engine, boardMapper, printer);
 
     public MatrixBoard getBoard() { return board; }
     public GameState getState() { return state; }
+    public EventBus getEventBus() { return eventBus; }
     public GameEngine getEngine() { return engine; }
     public RealTimeArbiter getUpdater() { return arbiter; }
     public BoardPrinter getPrinter() { return printer; }

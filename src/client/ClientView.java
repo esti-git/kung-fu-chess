@@ -1,0 +1,357 @@
+package client;
+
+import audio.SoundManager;
+import config.GameConfig;
+import enums.PieceColor;
+import events.Event;
+import events.EventBus;
+import events.GameEndedEvent;
+import events.GameStartedEvent;
+import events.MoveMadeEvent;
+import events.PieceCapturedEvent;
+import model.Position;
+import protocol.JumpCommand;
+import protocol.MoveCommand;
+import protocol.NetworkState;
+import protocol.PieceCodes;
+import view.BoardRenderer;
+import view.BoardSnapshot;
+import view.GameAnimationController;
+import view.Img;
+import view.MoveHistoryTracker;
+import view.PieceSnapshot;
+import view.ScaledImagePanel;
+import view.ScoreTracker;
+
+import javax.swing.BorderFactory;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.border.TitledBorder;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics2D;
+import java.awt.Insets;
+import java.awt.RenderingHints;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
+
+/**
+ * Renders whatever {@link BoardSnapshot} the server last sent and sends clicks as move commands.
+ * Republishes server-broadcast game events onto a local {@link EventBus} so the same
+ * move-history/score/sound/animation components used by the single-player {@link view.BoardPrinter}
+ * work unchanged here.
+ */
+public class ClientView {
+
+    private static final int HISTORY_PANEL_WIDTH = 190;
+    private static final Color FRAME_BACKGROUND = new Color(22, 22, 26);
+    private static final Color PANEL_BACKGROUND = new Color(26, 26, 30);
+    private static final Color PANEL_ACCENT = new Color(191, 155, 87);
+    private static final Color PANEL_TEXT = new Color(225, 222, 215);
+    private static final Font MOVES_FONT = new Font("Consolas", Font.PLAIN, 14);
+    private static final Font SCORE_FONT = new Font("Segoe UI", Font.BOLD, 18);
+    private static final Font TITLE_FONT = new Font("Segoe UI", Font.BOLD, 15);
+
+    private final BoardRenderer renderer = new BoardRenderer();
+    private final ScaledImagePanel boardPanel = new ScaledImagePanel();
+    private final EventBus eventBus = new EventBus();
+    private final MoveHistoryTracker historyTracker = new MoveHistoryTracker(eventBus);
+    private final ScoreTracker scoreTracker = new ScoreTracker(eventBus);
+    private final SoundManager soundManager = new SoundManager(eventBus);
+    private final GameAnimationController animationController = new GameAnimationController(eventBus);
+
+    private GameClient client;
+    private volatile BoardSnapshot latestSnapshot;
+    private Position selected;
+
+    private JFrame guiWindow;
+    private JPanel westPanel;
+    private JPanel eastPanel;
+    private TitledBorder whiteBorder;
+    private TitledBorder blackBorder;
+    private JTextArea whiteMovesArea;
+    private JTextArea blackMovesArea;
+    private JLabel whiteScoreLabel;
+    private JLabel blackScoreLabel;
+    private int baselineWidth;
+    private int baselineHeight;
+
+    public ClientView() {
+        eventBus.subscribe(MoveMadeEvent.TYPE, event -> refreshHistoryPanelsOnEdt());
+        eventBus.subscribe(PieceCapturedEvent.TYPE, event -> refreshHistoryPanelsOnEdt());
+        eventBus.subscribe(GameStartedEvent.TYPE, event -> SwingUtilities.invokeLater(this::repaintBoard));
+        eventBus.subscribe(GameEndedEvent.TYPE, event -> SwingUtilities.invokeLater(this::repaintBoard));
+    }
+
+    public void setClient(GameClient client) {
+        this.client = client;
+    }
+
+    public void show() {
+        SwingUtilities.invokeLater(() -> {
+            guiWindow = new JFrame("Kung Fu Chess - Client");
+            guiWindow.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            boardPanel.setBackground(FRAME_BACKGROUND);
+
+            whiteMovesArea = createMovesArea();
+            blackMovesArea = createMovesArea();
+            whiteScoreLabel = createScoreLabel();
+            blackScoreLabel = createScoreLabel();
+            whiteBorder = createTitledBorder("White");
+            blackBorder = createTitledBorder("Black");
+
+            westPanel = buildSidePanel(whiteBorder, whiteMovesArea, whiteScoreLabel);
+            eastPanel = buildSidePanel(blackBorder, blackMovesArea, blackScoreLabel);
+
+            guiWindow.add(westPanel, BorderLayout.WEST);
+            guiWindow.add(boardPanel, BorderLayout.CENTER);
+            guiWindow.add(eastPanel, BorderLayout.EAST);
+
+            boardPanel.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    java.awt.Point imagePoint = boardPanel.panelToImage(e.getX(), e.getY());
+                    if (imagePoint == null) return;
+
+                    if (e.getClickCount() >= 2) {
+                        handleDoubleClick(imagePoint.x, imagePoint.y);
+                    } else {
+                        handleClick(imagePoint.x, imagePoint.y);
+                    }
+                }
+            });
+
+            guiWindow.setMinimumSize(new Dimension(500, 400));
+            guiWindow.pack();
+            guiWindow.setLocationRelativeTo(null);
+
+            baselineWidth = guiWindow.getWidth();
+            baselineHeight = guiWindow.getHeight();
+            guiWindow.addComponentListener(new ComponentAdapter() {
+                @Override
+                public void componentResized(ComponentEvent e) {
+                    rescaleSidePanels();
+                }
+            });
+
+            guiWindow.setVisible(true);
+            repaintBoard();
+            updateHistoryPanels();
+        });
+    }
+
+    public void onState(NetworkState state) {
+        this.latestSnapshot = state.snapshot;
+        SwingUtilities.invokeLater(this::repaintBoard);
+    }
+
+    public void onError(String message) {
+        System.err.println("Server rejected command: " + message);
+    }
+
+    public void onEvent(Event event) {
+        eventBus.publish(event);
+    }
+
+    private void refreshHistoryPanelsOnEdt() {
+        SwingUtilities.invokeLater(this::updateHistoryPanels);
+    }
+
+    private void repaintBoard() {
+        BoardSnapshot snapshot = latestSnapshot;
+        if (snapshot == null) return;
+        Img visualBoard = renderer.render(snapshot, selected);
+        if (animationController.isShowingGameOverOverlay()) {
+            drawGameOverOverlay(visualBoard.get());
+        }
+        boardPanel.setImage(visualBoard.get());
+        boardPanel.repaint();
+    }
+
+    private void handleClick(int pixelX, int pixelY) {
+        BoardSnapshot snapshot = latestSnapshot;
+        if (snapshot == null || client == null) return;
+
+        Position clicked = pixelToCell(pixelX, pixelY, snapshot.getRows(), snapshot.getCols());
+        if (clicked == null) return;
+
+        if (selected == null) {
+            if (snapshot.getPieceAt(clicked.getRow(), clicked.getCol()) != null) {
+                selected = clicked;
+            }
+            repaintBoard();
+            return;
+        }
+
+        if (selected.equals(clicked)) {
+            selected = null;
+            repaintBoard();
+            return;
+        }
+
+        PieceSnapshot selectedPiece = snapshot.getPieceAt(selected.getRow(), selected.getCol());
+        if (selectedPiece != null) {
+            String command = "" + PieceCodes.colorChar(selectedPiece.getColor()) + PieceCodes.kindChar(selectedPiece.getKind())
+                    + MoveCommand.squareName(selected.getRow(), selected.getCol(), snapshot.getRows())
+                    + MoveCommand.squareName(clicked.getRow(), clicked.getCol(), snapshot.getRows());
+            client.sendMove(command);
+        }
+
+        selected = null;
+        repaintBoard();
+    }
+
+    /** Mirrors input.Controller#jump: a double-click jumps the piece under the cursor in place, bypassing selection. */
+    private void handleDoubleClick(int pixelX, int pixelY) {
+        BoardSnapshot snapshot = latestSnapshot;
+        if (snapshot == null || client == null) return;
+
+        Position clicked = pixelToCell(pixelX, pixelY, snapshot.getRows(), snapshot.getCols());
+        if (clicked == null) return;
+
+        PieceSnapshot piece = snapshot.getPieceAt(clicked.getRow(), clicked.getCol());
+        if (piece != null) {
+            String command = JumpCommand.build(piece.getColor(), piece.getKind(), clicked.getRow(), clicked.getCol(), snapshot.getRows());
+            client.sendJump(command);
+        }
+
+        selected = null;
+        repaintBoard();
+    }
+
+    /** Same pixel math as input.BoardMapper, without requiring a live model.Board - the client has none. */
+    private Position pixelToCell(int x, int y, int rows, int cols) {
+        int cellSize = GameConfig.CELL_SIZE;
+        int margin = GameConfig.BOARD_LABEL_MARGIN;
+
+        int adjustedX = x - margin;
+        int adjustedY = y - margin;
+        if (adjustedX < 0 || adjustedY < 0) return null;
+
+        int col = adjustedX / cellSize;
+        int row = adjustedY / cellSize;
+        if (row >= 0 && row < rows && col >= 0 && col < cols) {
+            return new Position(row, col);
+        }
+        return null;
+    }
+
+    private void rescaleSidePanels() {
+        if (baselineWidth <= 0 || baselineHeight <= 0 || westPanel == null || eastPanel == null) return;
+
+        double scaleX = guiWindow.getWidth() / (double) baselineWidth;
+        double scaleY = guiWindow.getHeight() / (double) baselineHeight;
+        double scale = Math.max(0.5, Math.min(2.5, Math.min(scaleX, scaleY)));
+
+        int panelWidth = Math.max(90, (int) Math.round(HISTORY_PANEL_WIDTH * scale));
+        westPanel.setPreferredSize(new Dimension(panelWidth, 10));
+        eastPanel.setPreferredSize(new Dimension(panelWidth, 10));
+
+        float movesFontSize = (float) Math.max(9.0, MOVES_FONT.getSize() * scale);
+        float scoreFontSize = (float) Math.max(11.0, SCORE_FONT.getSize() * scale);
+        float titleFontSize = (float) Math.max(10.0, TITLE_FONT.getSize() * scale);
+
+        whiteMovesArea.setFont(MOVES_FONT.deriveFont(movesFontSize));
+        blackMovesArea.setFont(MOVES_FONT.deriveFont(movesFontSize));
+        whiteScoreLabel.setFont(SCORE_FONT.deriveFont(scoreFontSize));
+        blackScoreLabel.setFont(SCORE_FONT.deriveFont(scoreFontSize));
+        whiteBorder.setTitleFont(TITLE_FONT.deriveFont(titleFontSize));
+        blackBorder.setTitleFont(TITLE_FONT.deriveFont(titleFontSize));
+
+        guiWindow.revalidate();
+        guiWindow.repaint();
+    }
+
+    private JTextArea createMovesArea() {
+        JTextArea area = new JTextArea();
+        area.setEditable(false);
+        area.setFont(MOVES_FONT);
+        area.setBackground(PANEL_BACKGROUND);
+        area.setForeground(PANEL_TEXT);
+        area.setCaretColor(PANEL_TEXT);
+        area.setMargin(new Insets(8, 10, 8, 10));
+        return area;
+    }
+
+    private JLabel createScoreLabel() {
+        JLabel label = new JLabel("Score: 0");
+        label.setHorizontalAlignment(SwingConstants.CENTER);
+        label.setFont(SCORE_FONT);
+        label.setOpaque(true);
+        label.setBackground(PANEL_ACCENT);
+        label.setForeground(new Color(30, 28, 24));
+        label.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
+        return label;
+    }
+
+    private TitledBorder createTitledBorder(String title) {
+        TitledBorder titledBorder = BorderFactory.createTitledBorder(
+                BorderFactory.createLineBorder(PANEL_ACCENT, 2), title);
+        titledBorder.setTitleFont(TITLE_FONT);
+        titledBorder.setTitleColor(PANEL_ACCENT);
+        return titledBorder;
+    }
+
+    private JPanel buildSidePanel(TitledBorder titledBorder, JTextArea movesArea, JLabel scoreLabel) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setPreferredSize(new Dimension(HISTORY_PANEL_WIDTH, 10));
+        panel.setBackground(PANEL_BACKGROUND);
+        panel.setBorder(titledBorder);
+
+        JScrollPane scrollPane = new JScrollPane(movesArea);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+
+        panel.add(scoreLabel, BorderLayout.NORTH);
+        panel.add(scrollPane, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private void updateHistoryPanels() {
+        if (whiteMovesArea == null || blackMovesArea == null) return;
+        whiteMovesArea.setText(String.join("\n", historyTracker.getWhiteMoves()));
+        blackMovesArea.setText(String.join("\n", historyTracker.getBlackMoves()));
+        whiteMovesArea.setCaretPosition(whiteMovesArea.getDocument().getLength());
+        blackMovesArea.setCaretPosition(blackMovesArea.getDocument().getLength());
+        whiteScoreLabel.setText("Score: " + scoreTracker.getWhiteScore());
+        blackScoreLabel.setText("Score: " + scoreTracker.getBlackScore());
+    }
+
+    private void drawGameOverOverlay(BufferedImage image) {
+        Graphics2D g = image.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        g.setColor(new Color(0, 0, 0, 160));
+        g.fillRect(0, 0, image.getWidth(), image.getHeight());
+        g.setColor(Color.WHITE);
+
+        String title = "GAME OVER";
+        g.setFont(g.getFont().deriveFont(Font.BOLD, 48f));
+        FontMetrics titleMetrics = g.getFontMetrics();
+        int titleX = (image.getWidth() - titleMetrics.stringWidth(title)) / 2;
+        int titleY = image.getHeight() / 2 - 10;
+        g.drawString(title, titleX, titleY);
+
+        PieceColor winner = animationController.getWinnerColor();
+        if (winner != null) {
+            String winnerText = (winner == PieceColor.WHITE ? "White" : "Black") + " wins!";
+            g.setFont(g.getFont().deriveFont(Font.BOLD, 28f));
+            FontMetrics winnerMetrics = g.getFontMetrics();
+            int winnerX = (image.getWidth() - winnerMetrics.stringWidth(winnerText)) / 2;
+            int winnerY = titleY + titleMetrics.getDescent() + winnerMetrics.getAscent() + 15;
+            g.drawString(winnerText, winnerX, winnerY);
+        }
+
+        g.dispose();
+    }
+}
