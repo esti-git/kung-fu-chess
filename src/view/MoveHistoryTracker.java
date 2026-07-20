@@ -1,53 +1,43 @@
 package view;
 
 import enums.PieceColor;
+import events.Event;
+import events.EventBus;
+import events.MoveMadeEvent;
 import model.Position;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
- * צופה בתמונת המצב (BoardSnapshot) מהצד ומזהה מהלכים לפי השוואת מיקומי הכלים בין בדיקה לבדיקה -
- * לא מקבל שום קריאה מקוד ביצוע המהלכים עצמו (RealTimeArbiter/GameEngine), ולא נוגע בלוח החי כלל.
+ * Subscribes to {@link MoveMadeEvent} on the {@link EventBus} and records a formatted move log -
+ * does not receive any direct call from the move execution code itself (RealTimeArbiter/GameEngine),
+ * and never touches the live board.
  */
 public class MoveHistoryTracker {
 
     private final List<String> whiteMoves = new ArrayList<>();
     private final List<String> blackMoves = new ArrayList<>();
-    private final Map<Integer, Position> lastKnownPositions = new HashMap<>();
+
+    public MoveHistoryTracker(EventBus eventBus) {
+        eventBus.subscribe(MoveMadeEvent.TYPE, this::onMoveMade);
+    }
 
     public List<String> getWhiteMoves() { return whiteMoves; }
     public List<String> getBlackMoves() { return blackMoves; }
 
-    /** מנקה את ההיסטוריה - חובה לקרוא כשמתחילים משחק חדש, אחרת ה-id של כלים חדשים עלול להתנגש עם כלים ישנים */
+    /** מנקה את ההיסטוריה - חובה לקרוא כשמתחילים משחק חדש */
     public void reset() {
         whiteMoves.clear();
         blackMoves.clear();
-        lastKnownPositions.clear();
     }
 
-    public void poll(BoardSnapshot snapshot) {
-        int rows = snapshot.getRows();
-        for (int r = 0; r < rows; r++) {
-            for (int c = 0; c < snapshot.getCols(); c++) {
-                PieceSnapshot piece = snapshot.getPieceAt(r, c);
-                if (piece == null) continue;
-
-                Position previous = lastKnownPositions.get(piece.getId());
-                if (previous != null && (previous.getRow() != r || previous.getCol() != c)) {
-                    List<String> targetList = (piece.getColor() == PieceColor.WHITE) ? whiteMoves : blackMoves;
-                    String entry = (targetList.size() + 1) + ". " + piece.getRepresentation()
-                            + " " + toSquare(previous, rows) + "-" + toSquare(r, c, rows);
-                    targetList.add(entry);
-                }
-
-                // עדכון רק לכלים שנצפו כרגע בפועל - כלי שבתנועה/קפיצה כרגע (ולכן זמנית לא נמצא באף משבצת)
-                // שומר על המיקום האחרון שבו כן נצפה, כדי שהמהלך יזוהה נכון כשהוא יגיע/ינחת
-                lastKnownPositions.put(piece.getId(), new Position(r, c));
-            }
-        }
+    private void onMoveMade(Event event) {
+        MoveMadeEvent move = (MoveMadeEvent) event;
+        List<String> targetList = (move.getPlayer() == PieceColor.WHITE) ? whiteMoves : blackMoves;
+        String entry = (targetList.size() + 1) + ". " + move.getPieceRepresentation()
+                + " " + toSquare(move.getFrom(), move.getBoardRows()) + "-" + toSquare(move.getTo(), move.getBoardRows());
+        targetList.add(entry);
     }
 
     private String toSquare(Position pos, int rows) {

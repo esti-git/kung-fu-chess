@@ -4,6 +4,10 @@ import config.GameConfig;
 import enums.PieceColor;
 import enums.PieceKind;
 import enums.PieceState;
+import events.EventBus;
+import events.GameEndedEvent;
+import events.MoveMadeEvent;
+import events.PieceCapturedEvent;
 import model.Board;
 import model.CaptureRecord;
 import model.Piece;
@@ -22,6 +26,7 @@ import java.util.Set;
 
 public class RealTimeArbiter {
     private final Board board;
+    private final EventBus eventBus;
     private final List<PendingMove> activeMoves = new ArrayList<>();
     private final List<PendingJump> activeJumps = new ArrayList<>();
     private final List<PendingRest> activeRests = new ArrayList<>();
@@ -30,7 +35,12 @@ public class RealTimeArbiter {
     private PieceColor winnerColor;
 
     public RealTimeArbiter(Board board) {
+        this(board, new EventBus());
+    }
+
+    public RealTimeArbiter(Board board, EventBus eventBus) {
         this.board = board;
+        this.eventBus = eventBus;
     }
 
     public long getCurrentTimeMillis() {
@@ -176,9 +186,11 @@ public class RealTimeArbiter {
             } else {
                 board.removePiece(destination);
                 captureLog.add(new CaptureRecord(target.getColor(), target.getKind()));
+                eventBus.publish(new PieceCapturedEvent(target.getColor(), target.getKind(), movingPiece.getColor()));
                 if (target.getKind() == PieceKind.KING) {
                     kingCaptured = true;
                     winnerColor = movingPiece.getColor();
+                    eventBus.publish(new GameEndedEvent(winnerColor));
                 }
             }
         }
@@ -186,6 +198,9 @@ public class RealTimeArbiter {
         Piece promotedPiece = PawnPromotion.applyPromotion(movingPiece, destination.getRow(), board.getRows());
         board.addPiece(destination, promotedPiece);
         beginRest(promotedPiece, PieceState.LONG_REST, GameConfig.LONG_REST_DURATION_MS);
+
+        eventBus.publish(new MoveMadeEvent(promotedPiece.getColor(), promotedPiece.getKind(),
+                promotedPiece.getRepresentation(), source, destination, board.getRows()));
 
         return kingCaptured;
     }
@@ -206,9 +221,11 @@ public class RealTimeArbiter {
         } else if (existingPiece.getColor() != piece.getColor()) {
             board.removePiece(jumpPosition);
             captureLog.add(new CaptureRecord(existingPiece.getColor(), existingPiece.getKind()));
+            eventBus.publish(new PieceCapturedEvent(existingPiece.getColor(), existingPiece.getKind(), piece.getColor()));
             if (existingPiece.getKind() == PieceKind.KING) {
                 kingCaptured = true;
                 winnerColor = piece.getColor();
+                eventBus.publish(new GameEndedEvent(winnerColor));
             }
 
             board.addPiece(jumpPosition, piece);

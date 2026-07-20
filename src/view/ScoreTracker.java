@@ -2,42 +2,41 @@ package view;
 
 import enums.PieceColor;
 import enums.PieceKind;
-
-import java.util.List;
+import events.Event;
+import events.EventBus;
+import events.PieceCapturedEvent;
 
 /**
- * צופה בתמונת המצב (BoardSnapshot) מהצד ומזהה תפיסות דרך יומן התפיסות של הארביטר -
- * לא מקבל שום קריאה מקוד ביצוע המהלכים/התפיסות עצמו, ולא מחזיק שום הפניה לכלים חיים.
+ * Subscribes to {@link PieceCapturedEvent} on the {@link EventBus} and keeps a running score -
+ * does not receive any direct call from the move/capture execution code itself.
  */
 public class ScoreTracker {
 
-    private int processedCaptureCount;
     private int whiteScore;
     private int blackScore;
+
+    public ScoreTracker(EventBus eventBus) {
+        eventBus.subscribe(PieceCapturedEvent.TYPE, this::onPieceCaptured);
+    }
 
     public int getWhiteScore() { return whiteScore; }
     public int getBlackScore() { return blackScore; }
 
     /** מנקה את הניקוד - חובה לקרוא כשמתחילים משחק חדש */
     public void reset() {
-        processedCaptureCount = 0;
         whiteScore = 0;
         blackScore = 0;
     }
 
-    public void poll(BoardSnapshot snapshot) {
-        List<CaptureSnapshot> captureLog = snapshot.getCaptureLog();
-        for (int i = processedCaptureCount; i < captureLog.size(); i++) {
-            CaptureSnapshot capture = captureLog.get(i);
-            int value = pointValue(capture.getCapturedKind());
-            // מי שנתפס מפסיד את הנקודות, הצד השני מקבל אותן
-            if (capture.getCapturedColor() == PieceColor.WHITE) {
-                blackScore += value;
-            } else {
-                whiteScore += value;
-            }
+    private void onPieceCaptured(Event event) {
+        PieceCapturedEvent captured = (PieceCapturedEvent) event;
+        int value = pointValue(captured.getCapturedKind());
+        // מי שנתפס מפסיד את הנקודות, הצד השני מקבל אותן
+        if (captured.getCapturedColor() == PieceColor.WHITE) {
+            blackScore += value;
+        } else {
+            whiteScore += value;
         }
-        processedCaptureCount = captureLog.size();
     }
 
     private int pointValue(PieceKind kind) {

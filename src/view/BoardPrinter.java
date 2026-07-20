@@ -1,7 +1,11 @@
 package view;
 
+import audio.SoundManager;
 import engine.GameEngine;
 import enums.PieceColor;
+import events.EventBus;
+import events.MoveMadeEvent;
+import events.PieceCapturedEvent;
 import input.CommandRegistry;
 import input.Controller;
 import input.GameLoop;
@@ -33,12 +37,13 @@ public class BoardPrinter {
     private static final Font MOVES_FONT = new Font("Consolas", Font.PLAIN, 14);
     private static final Font SCORE_FONT = new Font("Segoe UI", Font.BOLD, 18);
     private static final Font TITLE_FONT = new Font("Segoe UI", Font.BOLD, 15);
-    private static final int HISTORY_POLL_MS = 500; // אין צורך בעדכון מיידי - גם שנייה אחרי זה בסדר
 
     private final BoardRenderer renderer;
     private final BoardSnapshotFactory snapshotFactory;
     private final MoveHistoryTracker historyTracker;
     private final ScoreTracker scoreTracker;
+    private final SoundManager soundManager;
+    private final GameAnimationController animationController;
     private GameEngine engine;
     private CommandRegistry registry;
     private Controller controller;
@@ -57,13 +62,20 @@ public class BoardPrinter {
     private int baselineWidth;
     private int baselineHeight;
     private GameLoop gameLoop; // מריץ את לולאת הזמן-אמת של המשחק (קצב, שעון המנוע, restart)
-    private Timer historyTimer; // טיימר נפרד ואיטי - "צופה מהצד" על שינויים בלוח, לא מחובר לקוד ביצוע המהלכים/התפיסות
 
-    public BoardPrinter() {
+    public BoardPrinter(EventBus eventBus) {
         this.renderer = new BoardRenderer();
         this.snapshotFactory = new BoardSnapshotFactory();
-        this.historyTracker = new MoveHistoryTracker();
-        this.scoreTracker = new ScoreTracker();
+        this.historyTracker = new MoveHistoryTracker(eventBus);
+        this.scoreTracker = new ScoreTracker(eventBus);
+        this.soundManager = new SoundManager(eventBus);
+        this.animationController = new GameAnimationController(eventBus);
+        eventBus.subscribe(MoveMadeEvent.TYPE, event -> refreshHistoryPanelsOnEdt());
+        eventBus.subscribe(PieceCapturedEvent.TYPE, event -> refreshHistoryPanelsOnEdt());
+    }
+
+    private void refreshHistoryPanelsOnEdt() {
+        SwingUtilities.invokeLater(this::updateHistoryPanels);
     }
 
     public void setEngine(GameEngine engine) {
@@ -128,7 +140,6 @@ public class BoardPrinter {
         if (guiWindow == null) {
             initGUIWindow();
             startGameLoop(); // הפעלת לולאת הזמן-אמת (GameLoop) ברקע
-            startHistoryLoop(); // צופה איטי ונפרד שרק בודק מבחוץ מה השתנה בלוח
         } else {
             updateGUIImage();
         }
@@ -278,7 +289,7 @@ public class BoardPrinter {
             if (engine == null || boardPanel == null) return;
             BoardSnapshot snapshot = snapshotFactory.capture(engine);
             Img visualBoard = renderer.render(snapshot, (controller != null) ? controller.selectedPosition() : null);
-            if (engine.isGameOver()) {
+            if (animationController.isShowingGameOverOverlay()) {
                 drawGameOverOverlay(visualBoard.get());
             }
             boardPanel.setImage(visualBoard.get());
@@ -301,7 +312,7 @@ public class BoardPrinter {
         int titleY = image.getHeight() / 2 - 10;
         g.drawString(title, titleX, titleY);
 
-        PieceColor winner = (engine != null) ? engine.getWinnerColor() : null;
+        PieceColor winner = animationController.getWinnerColor();
         if (winner != null) {
             String winnerText = (winner == PieceColor.WHITE ? "לבן" : "שחור") + " מנצח!";
             g.setFont(g.getFont().deriveFont(Font.BOLD, 28f));
@@ -321,21 +332,6 @@ public class BoardPrinter {
         gameLoop = new GameLoop(engine, this::updateGUIImage);
         gameLoop.setRestartAction(restartAction);
         gameLoop.start();
-    }
-
-    /**
-     * טיימר איטי ונפרד לגמרי מלולאת המשחק - רק "מציץ" בלוח מבחוץ ומזהה שינויים במיקומי הכלים.
-     * לא מקבל אף קריאה מקוד המהלכים/הקפיצות עצמו, ולכן אין צורך שיתעדכן מיידית.
-     */
-    private void startHistoryLoop() {
-        historyTimer = new Timer(HISTORY_POLL_MS, e -> {
-            if (engine == null) return;
-            BoardSnapshot snapshot = snapshotFactory.capture(engine);
-            historyTracker.poll(snapshot);
-            scoreTracker.poll(snapshot);
-            updateHistoryPanels();
-        });
-        historyTimer.start();
     }
 
     private void updateHistoryPanels() {

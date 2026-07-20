@@ -2,6 +2,8 @@ package input;
 
 import board.MatrixBoard;
 import engine.GameEngine;
+import events.EventBus;
+import events.GameStartedEvent;
 import io.BoardParser;
 import view.BoardPrinter;
 import model.GameState;
@@ -25,6 +27,7 @@ public class GameFactory {
     );
     private final MatrixBoard board;
     private final GameState state;
+    private final EventBus eventBus;
     private final GameEngine engine;
     private final RealTimeArbiter arbiter;
     private final BoardPrinter printer;
@@ -36,11 +39,12 @@ public class GameFactory {
 public GameFactory() {
     this.board = new MatrixBoard();
     this.state = createGameState();
+    this.eventBus = new EventBus();
     this.engine = new GameEngine(state);
-    this.arbiter = new RealTimeArbiter(board);
+    this.arbiter = new RealTimeArbiter(board, eventBus);
     this.engine.setArbiter(arbiter);
-    this.printer = new BoardPrinter();
-    
+    this.printer = new BoardPrinter(eventBus);
+
     this.printer.setEngine(engine); 
     
     this.boardParser = new BoardParser();
@@ -64,6 +68,7 @@ this.controller = new Controller(engine, boardMapper, printer);
     public void initializeStandardBoard() {
         List<Piece> pieces = boardParser.parse(STANDARD_BOARD);
         board.initialize(pieces, boardParser.parseRows(STANDARD_BOARD), boardParser.parseCols(STANDARD_BOARD));
+        eventBus.publish(new GameStartedEvent());
     }
 
     /**
