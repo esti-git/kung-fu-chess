@@ -9,7 +9,8 @@ public class ServerMain {
         GameFactory factory = new GameFactory();
         factory.initializeStandardBoard();
 
-        GameServer server = new GameServer(PORT, factory);
+        PlayerRepository repository = new PlayerRepository();
+        GameServer server = new GameServer(PORT, factory, repository);
         server.start();
         server.runGameLoop();
     }

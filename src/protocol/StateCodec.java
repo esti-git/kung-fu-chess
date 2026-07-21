@@ -159,23 +159,47 @@ public class StateCodec {
         return root.toString();
     }
 
-    public static String encodeJoin(String username) {
+    public static String encodeLogin(String username, String password) {
         JSONObject root = new JSONObject();
-        root.put("type", "join");
+        root.put("type", "login");
         root.put("username", username);
+        root.put("password", password);
         return root.toString();
     }
 
-    public static String decodeJoinUsername(String rawJson) {
+    public static String decodeLoginUsername(String rawJson) {
         return new JSONObject(rawJson).optString("username", "");
     }
 
-    public static String encodeAssign(PieceColor color, String whiteName, String blackName) {
+    public static String decodeLoginPassword(String rawJson) {
+        return new JSONObject(rawJson).optString("password", "");
+    }
+
+    public static String encodeLoginResult(boolean success, int rating, String message) {
+        JSONObject root = new JSONObject();
+        root.put("type", "loginResult");
+        root.put("success", success);
+        root.put("rating", rating);
+        root.put("message", message == null ? JSONObject.NULL : message);
+        return root.toString();
+    }
+
+    public static LoginResult decodeLoginResult(String rawJson) {
+        JSONObject root = new JSONObject(rawJson);
+        boolean success = root.optBoolean("success", false);
+        int rating = root.optInt("rating", 0);
+        String message = root.isNull("message") ? null : root.optString("message", null);
+        return new LoginResult(success, rating, message);
+    }
+
+    public static String encodeAssign(PieceColor color, String whiteName, String blackName, int whiteRating, int blackRating) {
         JSONObject root = new JSONObject();
         root.put("type", "assign");
         root.put("color", color.name());
         root.put("whiteName", whiteName == null ? JSONObject.NULL : whiteName);
         root.put("blackName", blackName == null ? JSONObject.NULL : blackName);
+        root.put("whiteRating", whiteRating);
+        root.put("blackRating", blackRating);
         return root.toString();
     }
 
@@ -184,7 +208,9 @@ public class StateCodec {
         PieceColor color = PieceColor.valueOf(root.getString("color"));
         String whiteName = root.isNull("whiteName") ? null : root.getString("whiteName");
         String blackName = root.isNull("blackName") ? null : root.getString("blackName");
-        return new AssignedIdentity(color, whiteName, blackName);
+        int whiteRating = root.optInt("whiteRating", 1200);
+        int blackRating = root.optInt("blackRating", 1200);
+        return new AssignedIdentity(color, whiteName, blackName, whiteRating, blackRating);
     }
 
     public static String encodeRejected(String message) {

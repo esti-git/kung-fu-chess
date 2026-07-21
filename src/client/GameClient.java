@@ -12,6 +12,7 @@ import java.util.function.Consumer;
 public class GameClient extends WebSocketClient {
 
     private final String username;
+    private final String password;
     private final Consumer<protocol.NetworkState> onState;
     private final Consumer<String> onError;
     private final Consumer<Event> onEvent;
@@ -19,12 +20,15 @@ public class GameClient extends WebSocketClient {
     private final Consumer<String> onRejected;
     private final Consumer<String> onOpponentDisconnected;
     private final Consumer<String> onConnectionClosed;
+    private final Consumer<protocol.LoginResult> onLoginResult;
 
-    public GameClient(URI serverUri, String username, Consumer<protocol.NetworkState> onState, Consumer<String> onError,
-                       Consumer<Event> onEvent, Consumer<protocol.AssignedIdentity> onAssign, Consumer<String> onRejected,
-                       Consumer<String> onOpponentDisconnected, Consumer<String> onConnectionClosed) {
+    public GameClient(URI serverUri, String username, String password, Consumer<protocol.NetworkState> onState,
+                       Consumer<String> onError, Consumer<Event> onEvent, Consumer<protocol.AssignedIdentity> onAssign,
+                       Consumer<String> onRejected, Consumer<String> onOpponentDisconnected,
+                       Consumer<String> onConnectionClosed, Consumer<protocol.LoginResult> onLoginResult) {
         super(serverUri);
         this.username = username;
+        this.password = password;
         this.onState = onState;
         this.onError = onError;
         this.onEvent = onEvent;
@@ -32,12 +36,13 @@ public class GameClient extends WebSocketClient {
         this.onRejected = onRejected;
         this.onOpponentDisconnected = onOpponentDisconnected;
         this.onConnectionClosed = onConnectionClosed;
+        this.onLoginResult = onLoginResult;
     }
 
     @Override
     public void onOpen(ServerHandshake handshake) {
         System.out.println("Connected to game server");
-        send(StateCodec.encodeJoin(username));
+        send(StateCodec.encodeLogin(username, password));
     }
 
     @Override
@@ -55,6 +60,8 @@ public class GameClient extends WebSocketClient {
             onRejected.accept(StateCodec.decodeErrorMessage(message));
         } else if ("opponentDisconnected".equals(type)) {
             onOpponentDisconnected.accept(StateCodec.decodeErrorMessage(message));
+        } else if ("loginResult".equals(type)) {
+            onLoginResult.accept(StateCodec.decodeLoginResult(message));
         }
     }
 

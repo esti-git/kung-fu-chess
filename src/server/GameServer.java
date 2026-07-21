@@ -15,6 +15,7 @@ import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 import protocol.JumpCommand;
+import protocol.LoginResult;
 import protocol.MoveCommand;
 import protocol.StateCodec;
 import view.BoardSnapshot;
@@ -34,28 +35,32 @@ public class GameServer extends WebSocketServer {
 
     private final GameFactory factory;
     private final GameEngine engine;
+    private final PlayerRepository repository;
     private final BoardSnapshotFactory snapshotFactory = new BoardSnapshotFactory();
     private final Object engineLock = new Object();
 
     private volatile boolean running = true;
     private boolean gameOverHandled;
     private long gameOverAtMillis;
+    private boolean ratingsAppliedForCurrentGame;
 
     private PlayerSession whiteSession;
     private PlayerSession blackSession;
     private WebSocket whiteConn;
     private WebSocket blackConn;
 
-    public GameServer(int port, GameFactory factory) {
+    public GameServer(int port, GameFactory factory, PlayerRepository repository) {
         super(new InetSocketAddress(port));
         this.factory = factory;
         this.engine = factory.getEngine();
+        this.repository = repository;
 
         EventBus eventBus = factory.getEventBus();
         eventBus.subscribe(MoveMadeEvent.TYPE, this::broadcastEvent);
         eventBus.subscribe(PieceCapturedEvent.TYPE, this::broadcastEvent);
         eventBus.subscribe(GameStartedEvent.TYPE, this::broadcastEvent);
         eventBus.subscribe(GameEndedEvent.TYPE, this::broadcastEvent);
+        eventBus.subscribe(GameEndedEvent.TYPE, this::applyEloOnGameEnd);
     }
 
     private void broadcastEvent(Event event) {
@@ -98,6 +103,7 @@ public class GameServer extends WebSocketServer {
 
             factory.restartGame();
             gameOverHandled = false;
+            ratingsAppliedForCurrentGame = false;
         }
         broadcastState();
     }
@@ -123,20 +129,28 @@ public class GameServer extends WebSocketServer {
 
     /** Caller must hold engineLock. */
     private void handleControlMessage(WebSocket conn, String message) {
-        if ("join".equals(StateCodec.peekType(message))) {
-            handleJoin(conn, StateCodec.decodeJoinUsername(message));
+        if ("login".equals(StateCodec.peekType(message))) {
+            handleLogin(conn, StateCodec.decodeLoginUsername(message), StateCodec.decodeLoginPassword(message));
         }
     }
 
-    /** Caller must hold engineLock. Assigns White/Black by join order; a third joiner is rejected. */
-    private void handleJoin(WebSocket conn, String username) {
+    /** Caller must hold engineLock. Validates credentials against SQLite (auto-registering a new
+     *  username), then assigns White/Black by login order; a third joiner is rejected. */
+    private void handleLogin(WebSocket conn, String username, String password) {
         String name = (username == null || username.isBlank()) ? "Player" : username;
 
+        LoginResult result = repository.loginOrRegister(name, password);
+        if (!result.success) {
+            conn.send(StateCodec.encodeLoginResult(false, 0, result.message));
+            conn.close();
+            return;
+        }
+
         if (whiteSession == null) {
-            whiteSession = new PlayerSession(name, PieceColor.WHITE);
+            whiteSession = new PlayerSession(name, PieceColor.WHITE, result.rating);
             whiteConn = conn;
         } else if (blackSession == null) {
-            blackSession = new PlayerSession(name, PieceColor.BLACK);
+            blackSession = new PlayerSession(name, PieceColor.BLACK, result.rating);
             blackConn = conn;
         } else {
             conn.send(StateCodec.encodeRejected("Game already has two players."));
@@ -144,10 +158,42 @@ public class GameServer extends WebSocketServer {
             return;
         }
 
+        conn.send(StateCodec.encodeLoginResult(true, result.rating, null));
+        ratingsAppliedForCurrentGame = false;
+        broadcastAssignments();
+    }
+
+    /** Caller must hold engineLock. Sends each connected player their color, both usernames, and both ratings. */
+    private void broadcastAssignments() {
         String whiteName = whiteSession == null ? null : whiteSession.username;
         String blackName = blackSession == null ? null : blackSession.username;
-        if (whiteConn != null) whiteConn.send(StateCodec.encodeAssign(PieceColor.WHITE, whiteName, blackName));
-        if (blackConn != null) blackConn.send(StateCodec.encodeAssign(PieceColor.BLACK, whiteName, blackName));
+        int whiteRating = whiteSession == null ? 1200 : whiteSession.rating;
+        int blackRating = blackSession == null ? 1200 : blackSession.rating;
+        if (whiteConn != null) whiteConn.send(StateCodec.encodeAssign(PieceColor.WHITE, whiteName, blackName, whiteRating, blackRating));
+        if (blackConn != null) blackConn.send(StateCodec.encodeAssign(PieceColor.BLACK, whiteName, blackName, whiteRating, blackRating));
+    }
+
+    /** GameEndedEvent subscriber. Runs on the same thread already holding engineLock (all event
+     *  publishes happen from inside engine.requestMove/requestJump/advanceClock, which the server
+     *  only ever calls under engineLock) - safe without a second lock since monitors are reentrant. */
+    private void applyEloOnGameEnd(Event event) {
+        PieceColor winnerColor = ((GameEndedEvent) event).getWinnerColor();
+        if (winnerColor == null || whiteSession == null || blackSession == null || ratingsAppliedForCurrentGame) {
+            return;
+        }
+        ratingsAppliedForCurrentGame = true;
+
+        PlayerSession winner = winnerColor == PieceColor.WHITE ? whiteSession : blackSession;
+        PlayerSession loser = winnerColor == PieceColor.WHITE ? blackSession : whiteSession;
+
+        int[] updated = EloCalculator.computeNewRatings(winner.rating, loser.rating);
+        winner.rating = updated[0];
+        loser.rating = updated[1];
+
+        repository.updateRating(winner.username, winner.rating);
+        repository.updateRating(loser.username, loser.rating);
+
+        broadcastAssignments();
     }
 
     /** True if conn is the currently registered connection for that color. Guards against stale/in-flight
@@ -236,6 +282,7 @@ public class GameServer extends WebSocketServer {
                     } else if (now - gameOverAtMillis >= RESTART_DELAY_MS) {
                         factory.restartGame();
                         gameOverHandled = false;
+                        ratingsAppliedForCurrentGame = false;
                     }
                 } else {
                     engine.advanceClock(elapsed);

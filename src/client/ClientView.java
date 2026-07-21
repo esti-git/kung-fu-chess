@@ -12,6 +12,7 @@ import events.PieceCapturedEvent;
 import model.Position;
 import protocol.AssignedIdentity;
 import protocol.JumpCommand;
+import protocol.LoginResult;
 import protocol.MoveCommand;
 import protocol.NetworkState;
 import protocol.PieceCodes;
@@ -80,6 +81,8 @@ public class ClientView {
     private PieceColor myColor;
     private String whiteName;
     private String blackName;
+    private int whiteRating = 1200;
+    private int blackRating = 1200;
     private volatile boolean gameOver;
     private boolean disconnectNotified;
 
@@ -177,12 +180,22 @@ public class ClientView {
         this.myColor = identity.color;
         this.whiteName = identity.whiteName;
         this.blackName = identity.blackName;
+        this.whiteRating = identity.whiteRating;
+        this.blackRating = identity.blackRating;
         SwingUtilities.invokeLater(this::applyIdentityLabels);
     }
 
     public void onRejected(String message) {
         System.err.println("Join rejected: " + message);
         System.exit(0);
+    }
+
+    public void onLoginResult(LoginResult result) {
+        if (!result.success) {
+            onRejected(result.message);
+            return;
+        }
+        System.out.println("Logged in. Rating: " + result.rating);
     }
 
     public void onOpponentDisconnected(String message) {
@@ -211,15 +224,15 @@ public class ClientView {
     private void applyIdentityLabels() {
         if (guiWindow == null || whiteBorder == null || blackBorder == null) return;
 
-        String white = whiteName == null ? "waiting..." : whiteName;
-        String black = blackName == null ? "waiting..." : blackName;
+        String white = whiteName == null ? "waiting..." : whiteName + " (" + whiteRating + ")";
+        String black = blackName == null ? "waiting..." : blackName + " (" + blackRating + ")";
         whiteBorder.setTitle("White - " + white);
         blackBorder.setTitle("Black - " + black);
 
         if (myColor != null) {
             String you = myColor == PieceColor.WHITE ? "White" : "Black";
             String yourName = myColor == PieceColor.WHITE ? white : black;
-            guiWindow.setTitle("Kung Fu Chess - " + you + " (" + yourName + ")");
+            guiWindow.setTitle("Kung Fu Chess - " + you + " - " + yourName);
         }
 
         westPanel.repaint();
