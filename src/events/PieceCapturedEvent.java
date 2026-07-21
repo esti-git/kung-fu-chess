@@ -2,8 +2,10 @@ package events;
 
 import enums.PieceColor;
 import enums.PieceKind;
+import lombok.Getter;
 
 /** Published whenever a piece is removed from the board by an opposing piece. */
+@Getter
 public class PieceCapturedEvent extends Event {
 
     public static final String TYPE = "PIECE_CAPTURED";
@@ -17,17 +19,5 @@ public class PieceCapturedEvent extends Event {
         this.capturedColor = capturedColor;
         this.capturedKind = capturedKind;
         this.capturedBy = capturedBy;
-    }
-
-    public PieceColor getCapturedColor() {
-        return capturedColor;
-    }
-
-    public PieceKind getCapturedKind() {
-        return capturedKind;
-    }
-
-    public PieceColor getCapturedBy() {
-        return capturedBy;
     }
 }

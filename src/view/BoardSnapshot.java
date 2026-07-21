@@ -1,5 +1,7 @@
 package view;
 
+import lombok.Getter;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -7,6 +9,7 @@ import java.util.List;
  * תמונת מצב קפואה של כל מה שהתצוגה צריכה כדי לצייר/לעדכן פריים אחד -
  * לא מחזיקה שום הפניה חיה ללוח (Board) או לכלים (Piece) עצמם.
  */
+@Getter
 public class BoardSnapshot {
     private final int rows;
     private final int cols;
@@ -33,16 +36,7 @@ public class BoardSnapshot {
         this.gameClock = gameClock;
     }
 
-    public int getRows() { return rows; }
-    public int getCols() { return cols; }
-
     public PieceSnapshot getPieceAt(int row, int col) {
         return cells[row][col];
     }
-
-    public List<PendingMoveSnapshot> getPendingMoves() { return pendingMoves; }
-    public List<PendingJumpSnapshot> getPendingJumps() { return pendingJumps; }
-    public List<PendingRestSnapshot> getPendingRests() { return pendingRests; }
-    public List<CaptureSnapshot> getCaptureLog() { return captureLog; }
-    public long getGameClock() { return gameClock; }
 }

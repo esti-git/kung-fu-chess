@@ -2,9 +2,11 @@ package events;
 
 import enums.PieceColor;
 import enums.PieceKind;
+import lombok.Getter;
 import model.Position;
 
 /** Published whenever a piece finishes landing on a square, from either a move or a jump. */
+@Getter
 public class MoveMadeEvent extends Event {
 
     public static final String TYPE = "MOVE_MADE";
@@ -25,29 +27,5 @@ public class MoveMadeEvent extends Event {
         this.from = from;
         this.to = to;
         this.boardRows = boardRows;
-    }
-
-    public PieceColor getPlayer() {
-        return player;
-    }
-
-    public PieceKind getPieceKind() {
-        return pieceKind;
-    }
-
-    public String getPieceRepresentation() {
-        return pieceRepresentation;
-    }
-
-    public Position getFrom() {
-        return from;
-    }
-
-    public Position getTo() {
-        return to;
-    }
-
-    public int getBoardRows() {
-        return boardRows;
     }
 }

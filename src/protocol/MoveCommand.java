@@ -2,22 +2,18 @@ package protocol;
 
 import enums.PieceColor;
 import enums.PieceKind;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import model.Position;
 
 /** Parses raw move strings like "WQe2e5" (color + kind + from-square + to-square) sent by clients. */
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class MoveCommand {
 
     public final PieceColor color;
     public final PieceKind kind;
     public final Position from;
     public final Position to;
-
-    private MoveCommand(PieceColor color, PieceKind kind, Position from, Position to) {
-        this.color = color;
-        this.kind = kind;
-        this.from = from;
-        this.to = to;
-    }
 
     public static MoveCommand parse(String raw, int boardRows) {
         if (raw == null || raw.length() != 6) return null;

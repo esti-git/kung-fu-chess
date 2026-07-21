@@ -2,9 +2,12 @@ package protocol;
 
 import enums.PieceColor;
 import enums.PieceKind;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import model.Position;
 
 /** Parses raw jump strings like "JWQe2" (jump marker + color + kind + square) sent by clients. */
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class JumpCommand {
 
     private static final char PREFIX = 'J';
@@ -12,12 +15,6 @@ public class JumpCommand {
     public final PieceColor color;
     public final PieceKind kind;
     public final Position position;
-
-    private JumpCommand(PieceColor color, PieceKind kind, Position position) {
-        this.color = color;
-        this.kind = kind;
-        this.position = position;
-    }
 
     public static boolean isJumpCommand(String raw) {
         return raw != null && raw.length() >= 5 && raw.charAt(0) == PREFIX;

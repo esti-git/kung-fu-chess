@@ -1,15 +1,12 @@
 package view;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
 /** תמונת מצב קפואה של מנוחה פעילה - כמו model.PendingRest, אבל עם PieceSnapshot במקום Piece חי */
+@Getter
+@AllArgsConstructor
 public class PendingRestSnapshot {
     private final PieceSnapshot piece;
     private final long endTime;
-
-    public PendingRestSnapshot(PieceSnapshot piece, long endTime) {
-        this.piece = piece;
-        this.endTime = endTime;
-    }
-
-    public PieceSnapshot getPiece() { return piece; }
-    public long getEndTime() { return endTime; }
 }
