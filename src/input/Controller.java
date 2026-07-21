@@ -42,13 +42,13 @@ public class Controller {
         boardMapper.pixelToCell(x, y).ifPresent(position -> {
             if (selectedPosition == null) {
                 trySelect(position);
-                printer.printGUI(); // מרענן את המסך כדי לשמור על הבחירה הראשונה
+                printer.printGUI();
                 return;
             }
 
             if (selectedPosition.equals(position)) {
                 clearSelection();
-                printer.printGUI(); // מרענן את המסך לאחר ביטול בחירה
+                printer.printGUI();
                 return;
             }
 
@@ -57,12 +57,12 @@ public class Controller {
 
             if (selectedPiece != null && clickedPiece != null && selectedPiece.getColor() == clickedPiece.getColor()) {
                 trySelect(position);
-                printer.printGUI(); // מרענן את המסך כשמחליפים בחירה בין כלים מאותו צבע
+                printer.printGUI();
                 return;
             }
 
             engine.requestMove(selectedPosition, position);
-            // בין אם המהלך הצליח ובין אם לא (למשל לחיצה על משבצת שהחייל לא יכול להגיע אליה) - מבטלים את הבחירה
+
             clearSelection();
             printer.printGUI();
         });
@@ -73,7 +73,7 @@ public class Controller {
             GameResult<Void> jumpResult = engine.requestJump(position);
             if (jumpResult.isSuccess()) {
                 clearSelection();
-                printer.printGUI(); // מרענן את הלוח לאחר קפיצה מוצלחת
+                printer.printGUI();
             }
         });
     }

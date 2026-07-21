@@ -11,13 +11,6 @@ import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
 import java.io.File;
 
-/**
- * Subscribes to move/capture/game-start/game-end events and plays the matching sound effect.
- * Game logic never calls into this class directly - it only ever reacts to events on the bus.
- *
- * Sound files are optional: if assets/sounds/&lt;name&gt;.wav is missing, the clip is skipped and
- * a message is logged instead of failing, so the game runs fine before real audio assets exist.
- */
 public class SoundManager {
 
     private static final String SOUNDS_DIR = "assets/sounds/";

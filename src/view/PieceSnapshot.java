@@ -6,7 +6,6 @@ import enums.PieceState;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-/** תמונת מצב קפואה של כלי בודד, ללא הפניה חיה לאובייקט ה-Piece עצמו */
 @Getter
 @AllArgsConstructor
 public class PieceSnapshot {

@@ -51,7 +51,6 @@ public GameFactory() {
     this.boardMapper = new BoardMapper(board);
 this.controller = new Controller(engine, boardMapper, printer);
     this.registry = new CommandRegistry(controller, engine, printer);
-    // החיבור החדש שמאפשר ללחיצות העכבר לשלוח פקודות:
 
     this.printer.setRegistry(this.registry);
     this.printer.setController(this.controller);
@@ -62,18 +61,12 @@ this.controller = new Controller(engine, boardMapper, printer);
         return new GameState(board);
     }
 
-    /**
-     * מאתחל את הלוח ישירות למערך הפתיחה הסטנדרטי, בלי צורך בהקלדת "Board:" בקונסולה בכל הרצה.
-     */
     public void initializeStandardBoard() {
         List<Piece> pieces = boardParser.parse(STANDARD_BOARD);
         board.initialize(pieces, boardParser.parseRows(STANDARD_BOARD), boardParser.parseCols(STANDARD_BOARD));
         eventBus.publish(new GameStartedEvent());
     }
 
-    /**
-     * מתחיל משחק חדש מאפס על אותו לוח - נקרא על ידי BoardPrinter כמה שניות אחרי שהוצג GAME OVER.
-     */
     public void restartGame() {
         initializeStandardBoard();
         arbiter.reset();

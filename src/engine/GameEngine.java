@@ -75,10 +75,6 @@ public class GameEngine {
         return (arbiter != null) ? arbiter.getActiveRests() : new ArrayList<>();
     }
 
-    /**
-     * Cumulative capture log - kept even after a piece leaves the board, so display
-     * code (score, snapshots) never needs to touch the live board/pieces.
-     */
     public List<CaptureRecord> getCaptureLog() {
         return (arbiter != null) ? arbiter.getCaptureLog() : Collections.emptyList();
     }
@@ -112,9 +108,6 @@ public class GameEngine {
         if (from == null || to == null)
             return GameResult.fail("Invalid move positions");
 
-        // Note: "friendly piece already reserves destination via a pending jump" is
-        // validated
-        // by ruleEngine.validateMove below - no need to duplicate that check here.
         GameResult<Void> validation = ruleEngine.validateMove(
                 state.getBoard(),
                 from,

@@ -9,11 +9,6 @@ import model.Position;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Subscribes to {@link MoveMadeEvent} on the {@link EventBus} and records a formatted move log -
- * does not receive any direct call from the move execution code itself (RealTimeArbiter/GameEngine),
- * and never touches the live board.
- */
 public class MoveHistoryTracker {
 
     private final List<String> whiteMoves = new ArrayList<>();
@@ -26,7 +21,6 @@ public class MoveHistoryTracker {
     public List<String> getWhiteMoves() { return whiteMoves; }
     public List<String> getBlackMoves() { return blackMoves; }
 
-    /** מנקה את ההיסטוריה - חובה לקרוא כשמתחילים משחק חדש */
     public void reset() {
         whiteMoves.clear();
         blackMoves.clear();

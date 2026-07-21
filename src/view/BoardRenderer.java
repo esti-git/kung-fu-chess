@@ -23,7 +23,7 @@ public class BoardRenderer {
     private static final int DEFAULT_FPS = 6;
     private static final Pattern FPS_PATTERN = Pattern.compile("\"frames_per_sec\"\\s*:\\s*([0-9]+(\\.[0-9]+)?)");
     private static final Pattern IS_LOOP_PATTERN = Pattern.compile("\"is_loop\"\\s*:\\s*(true|false)");
-    private static final int LABEL_MARGIN = GameConfig.BOARD_LABEL_MARGIN; // רצועת שוליים סביב הלוח לאותיות ומספרים - חייב להתאים ל-BoardMapper
+    private static final int LABEL_MARGIN = GameConfig.BOARD_LABEL_MARGIN;
 
     private final int cellSize;
 
@@ -43,13 +43,10 @@ public class BoardRenderer {
         int cols = snapshot.getCols();
         long gameClock = snapshot.getGameClock();
 
-        // יצירת אובייקט Img חדש
         Img canvas = new Img();
 
-        // הגנה מפני קריסה: אם האובייקט הפנימי לא אותחל בבנאי הריק של Img, נדאג לוודא שיש לו תמונה ריקה בגודל הלוח
         ensureCanvasInitialized(canvas, rows, cols);
 
-        // ציור הרקע (לוח המשבצות + אותיות/מספרים מסביב)
         drawGrid(canvas, rows, cols);
         drawBoardLabels(canvas, rows, cols);
 
@@ -58,7 +55,6 @@ public class BoardRenderer {
             restByPieceId.put(rest.getPiece().getId(), rest);
         }
 
-        // ציור הכלים על הלוח - כלי שנמצא באמצע תנועה/קפיצה מצויר בנפרד (למטה), לפי מיקומו המדויק/אנימציה
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
                 PieceSnapshot piece = snapshot.getPieceAt(r, c);
@@ -77,17 +73,14 @@ public class BoardRenderer {
             }
         }
 
-        // ציור כלים בתנועה
         for (PendingMoveSnapshot move : snapshot.getPendingMoves()) {
             drawMovingPiece(canvas, move, gameClock);
         }
 
-        // ציור כלים בקפיצה
         for (PendingJumpSnapshot jump : snapshot.getPendingJumps()) {
             drawJumpingPiece(canvas, jump, gameClock);
         }
 
-        // מסגרת סביב המשבצת שנבחרה - מצוירת אחרונה כדי שתהיה תמיד גלויה מעל הכל
         if (selectedPosition != null) {
             drawSelectionHighlight(canvas, selectedPosition);
         }
@@ -96,12 +89,9 @@ public class BoardRenderer {
     }
 
     private static final Color FRAME_COLOR = new Color(22, 22, 26);
-    private static final Color FRAME_ACCENT = new Color(191, 155, 87); // זהב/ברונזה עדין - נותן מראה "פרימיום" על רקע כהה
-    private static final Color BRIGHT_GOLD = new Color(255, 200, 60); // אותו גוון זהב, אבל בהיר ורווי הרבה יותר - כדי שיהיה בולט לעין על גבי הלוח
+    private static final Color FRAME_ACCENT = new Color(191, 155, 87);
+    private static final Color BRIGHT_GOLD = new Color(255, 200, 60);
 
-    /**
-     * פונקציית הגנה שמוודאת של-Img יש BufferedImage תקני ולא null, וצובעת מסביב מסגרת כהה עם קו הבהקה זהוב
-     */
     private void ensureCanvasInitialized(Img canvas, int rows, int cols) {
         if (canvas.get() == null) {
             int width = cols * cellSize + LABEL_MARGIN * 2;
@@ -115,12 +105,10 @@ public class BoardRenderer {
         Graphics2D g = canvas.get().createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        // קו זהוב דק צמוד לקצה החיצוני של המסגרת
         g.setStroke(new BasicStroke(2f));
         g.setColor(FRAME_ACCENT);
         g.drawRect(4, 4, width - 9, height - 9);
 
-        // קו זהוב שני שתוחם בדיוק את שטח הלוח עצמו, למראה "ממוסגר"
         int boardLeft = LABEL_MARGIN - 6;
         int boardTop = LABEL_MARGIN - 6;
         int boardRight = width - LABEL_MARGIN + 6;
@@ -132,7 +120,6 @@ public class BoardRenderer {
         g.dispose();
     }
 
-    /** ממיר מיקום עמודה/שורה בלוח לקואורדינטת פיקסלים בקנבס, כולל היסט השוליים של התוויות */
     private int toPixelX(double col) {
         return LABEL_MARGIN + (int) Math.round(col * cellSize);
     }
@@ -149,7 +136,6 @@ public class BoardRenderer {
         getBoardBackground(width, height).drawOn(canvas, LABEL_MARGIN, LABEL_MARGIN);
     }
 
-    /** טוען (ומטמין במטמון) את תמונת הלוח שסופקה, ומתאים אותה בדיוק לגודל שטח הלוח */
     private Img getBoardBackground(int width, int height) {
         String key = width + "x" + height;
         Img cached = boardImageCache.get(key);
@@ -166,9 +152,8 @@ public class BoardRenderer {
         return img;
     }
 
-    private static final Color LABEL_COLOR = new Color(214, 186, 130); // גוון זהב-קרם, קריא וברור על רקע המסגרת הכהה
+    private static final Color LABEL_COLOR = new Color(214, 186, 130);
 
-    /** מצייר אותיות עמודות (a-h) למעלה ולמטה, ומספרי שורות (1-8) בצדדים - מסביב ללוח */
     private void drawBoardLabels(Img canvas, int rows, int cols) {
         Graphics2D g = canvas.get().createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -199,10 +184,6 @@ public class BoardRenderer {
 
     private static final Color REST_TINT = BRIGHT_GOLD;
 
-    /**
-     * מציג את הזמן שנותר במנוחה כמלבן מלא-צבע שגובהו קטן בהדרגה (כמו מד שמתרוקן כלפי מטה),
-     * במקום לדהות את העוצמה של הצבע עצמו
-     */
     private void drawRestOverlay(Img canvas, int x, int y, PieceSnapshot piece, PendingRestSnapshot rest, long gameClock) {
         long totalDuration = (piece.getState() == PieceState.LONG_REST)
                 ? GameConfig.LONG_REST_DURATION_MS
@@ -219,10 +200,6 @@ public class BoardRenderer {
         g.dispose();
     }
 
-    /**
-     * צל רך (מקורב על ידי כמה עיגולים חצי-שקופים בגדלים שונים) מתחת למקום בו הכלי יצויר -
-     * נותן תחושת "הכלי עומד" על הלוח במקום לרחף שטוח מעליו
-     */
     private void drawPieceShadow(Img canvas, int x, int y) {
         Graphics2D g = canvas.get().createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -257,13 +234,8 @@ public class BoardRenderer {
         g.dispose();
     }
 
-    /**
-     * @param elapsedMs זמן (במילישניות) מאז תחילת מצב האנימציה הנוכחי של הכלי -
-     *                  לכלי idle אפשר להעביר את שעון המשחק הכללי (לולאה מתמשכת),
-     *                  ולכלי בתנועה/קפיצה יש להעביר את הזמן שחלף מאז תחילת הפעולה.
-     */
     private void drawPieceAnimated(Img canvas, PieceSnapshot piece, int x, int y, String stateFolder, long elapsedMs) {
-        // נרמול שם התיקייה לפורמט של שתי אותיות גדולות, למשל: bB -> BB, wP -> PW
+
         String folderName = getNormalizedFolderName(piece.getRepresentation());
 
         int totalFrames = getFrameCount(folderName, stateFolder);
@@ -296,9 +268,6 @@ public class BoardRenderer {
         }
     }
 
-    /**
-     * ממפה מצב כלי לתיקיית האנימציה שלו על הלוח הראשי - MOVING/JUMPING מצוירים בנפרד (דרך drawMovingPiece/drawJumpingPiece)
-     */
     private String stateFolderFor(PieceState state) {
         switch (state) {
             case IDLE: return "idle";
@@ -308,17 +277,13 @@ public class BoardRenderer {
         }
     }
 
-    /**
-     * ממיר את קוד הכלי הלוגי לשם התיקייה הפיזית במערכת הקבצים שלכם (למשל BB לרץ שחור)
-     */
     private String getNormalizedFolderName(String representation) {
         if (representation == null || representation.length() < 2) {
             return representation;
         }
-        char color = representation.charAt(0); // 'w' או 'b'
-        char type = representation.charAt(1);  // 'P', 'R', 'N', 'B', 'Q', 'K'
+        char color = representation.charAt(0);
+        char type = representation.charAt(1);
 
-        // התאמה למבנה תיקיות כמו BB, QB, WP
         return (String.valueOf(type) + String.valueOf(color)).toUpperCase();
     }
 
@@ -345,13 +310,12 @@ public class BoardRenderer {
         long duration = jump.getEndTime() - jump.getStartTime();
         double t = duration <= 0 ? 1.0 : clamp01((gameClock - jump.getStartTime()) / (double) duration);
 
-        // קשת קלה כלפי מעלה כדי שהקפיצה תיראה כמו קפיצה ולא כמו החלפת פריים במקום
         int jumpHeight = cellSize / 2;
         int yOffset = (int) Math.round(-Math.sin(t * Math.PI) * jumpHeight);
 
         int groundX = toPixelX(jump.getCol());
         int groundY = toPixelY(jump.getRow());
-        // הצל נשאר על הקרקע בזמן שהכלי קופץ מעליו - נותן תחושת קפיצה אמיתית
+
         drawPieceShadow(canvas, groundX, groundY);
 
         long elapsedMs = gameClock - jump.getStartTime();

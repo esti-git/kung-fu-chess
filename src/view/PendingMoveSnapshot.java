@@ -3,7 +3,6 @@ package view;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-/** תמונת מצב קפואה של תנועה פעילה - כמו model.PendingMove, אבל עם PieceSnapshot במקום Piece חי */
 @Getter
 @AllArgsConstructor
 public class PendingMoveSnapshot {

@@ -6,7 +6,6 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import model.Position;
 
-/** Parses raw jump strings like "JWQe2" (jump marker + color + kind + square) sent by clients. */
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class JumpCommand {
 

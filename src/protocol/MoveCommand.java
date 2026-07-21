@@ -6,7 +6,6 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import model.Position;
 
-/** Parses raw move strings like "WQe2e5" (color + kind + from-square + to-square) sent by clients. */
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class MoveCommand {
 

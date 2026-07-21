@@ -11,9 +11,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-/** FIFO queue of players seeking a game, matched by ELO proximity. Not thread-safe on its own -
- *  every method here must be called while the caller holds GameServer's engineLock, same
- *  convention as GameServer's own engineLock-guarded helpers. */
 public class Matchmaker {
 
     private final LinkedHashMap<WebSocket, PlayerSession> waiting = new LinkedHashMap<>();
@@ -31,8 +28,6 @@ public class Matchmaker {
         timeouts.put(conn, future);
     }
 
-    /** Cancels the pending timeout (if any) and removes conn from the queue. Returns the session
-     *  that was waiting, or null if conn wasn't queued. */
     public PlayerSession remove(WebSocket conn) {
         ScheduledFuture<?> future = timeouts.remove(conn);
         if (future != null) {
@@ -45,8 +40,6 @@ public class Matchmaker {
         return waiting.containsKey(conn);
     }
 
-    /** Returns the first two waiting entries within GameConfig.RATING_RANGE of each other,
-     *  or null if no such pair exists yet. Does not remove them from the queue. */
     public List<Map.Entry<WebSocket, PlayerSession>> findCompatiblePair() {
         List<Map.Entry<WebSocket, PlayerSession>> entries = new ArrayList<>(waiting.entrySet());
         for (int i = 0; i < entries.size(); i++) {

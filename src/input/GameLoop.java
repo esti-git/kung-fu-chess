@@ -4,14 +4,10 @@ import engine.GameEngine;
 
 import javax.swing.Timer;
 
-/**
- * מריץ את לולאת הזמן-אמת של המשחק: מקדם את השעון הפנימי של המנוע, מזהה סיום משחק
- * ומתזמן restart אחריו. לא מצייר כלום בעצמו - רק קורא ל-onTick אחרי כל טיק כדי שהתצוגה תתעדכן.
- */
 public class GameLoop {
 
-    private static final int TICK_MS = 16; // כ-60 FPS
-    private static final int RESTART_DELAY_MS = 3000; // כמה זמן להציג GAME OVER לפני שמתחיל משחק חדש
+    private static final int TICK_MS = 16;
+    private static final int RESTART_DELAY_MS = 3000;
 
     private final GameEngine engine;
     private final Runnable onTick;

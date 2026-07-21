@@ -6,11 +6,6 @@ import events.EventBus;
 import events.GameEndedEvent;
 import events.GameStartedEvent;
 
-/**
- * Subscribes to {@link GameStartedEvent}/{@link GameEndedEvent} and tracks the game-over overlay
- * state on the UI's behalf, so rendering code never needs to ask the engine directly whether the
- * game is over or who won.
- */
 public class GameAnimationController {
 
     private volatile boolean showGameOverOverlay;

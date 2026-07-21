@@ -1,11 +1,9 @@
 package server;
 
-/** Standard ELO rating math - pure functions, no state. */
 public class EloCalculator {
 
     private static final int K_FACTOR = 32;
 
-    /** Returns {newWinnerRating, newLoserRating} after a decisive game. */
     public static int[] computeNewRatings(int winnerRating, int loserRating) {
         double expectedWinner = 1.0 / (1.0 + Math.pow(10, (loserRating - winnerRating) / 400.0));
         double expectedLoser = 1.0 - expectedWinner;

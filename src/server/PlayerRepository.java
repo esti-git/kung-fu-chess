@@ -12,7 +12,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.nio.charset.StandardCharsets;
 
-/** SQLite-backed player accounts: username/password (hashed) + persisted ELO rating. */
 public class PlayerRepository {
 
     private static final String DB_URL = "jdbc:sqlite:players.db";
@@ -34,7 +33,6 @@ public class PlayerRepository {
         }
     }
 
-    /** Logs in an existing account (password must match) or registers a new one at the starting rating. */
     public LoginResult loginOrRegister(String username, String rawPassword) {
         String hash = sha256(rawPassword);
         try {

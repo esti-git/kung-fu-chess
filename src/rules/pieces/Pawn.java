@@ -46,7 +46,6 @@ public class Pawn extends Piece {
                 return board.isEmpty(destination) ? null : "Forward move is blocked";
             }
 
-            // Forward two: isMovementPatternLegal already confirmed fromRow is the starting row.
             int middleRow = fromRow + expectedRowDirection;
             if (!board.isEmpty(new Position(middleRow, fromCol)) || !board.isEmpty(destination)) {
                 return "Pawn double-step path is blocked";
@@ -63,7 +62,6 @@ public class Pawn extends Piece {
             return null;
         }
 
-        // Diagonal capture (deltaCol == 1, guaranteed by isMovementPatternLegal).
         return destinationPiece != null ? null : "Pawn capture requires a target piece";
     }
 }

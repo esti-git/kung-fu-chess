@@ -4,7 +4,6 @@ import enums.PieceColor;
 import enums.PieceKind;
 import lombok.Getter;
 
-/** Published whenever a piece is removed from the board by an opposing piece. */
 @Getter
 public class PieceCapturedEvent extends Event {
 

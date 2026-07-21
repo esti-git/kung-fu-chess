@@ -5,10 +5,6 @@ import lombok.Getter;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * תמונת מצב קפואה של כל מה שהתצוגה צריכה כדי לצייר/לעדכן פריים אחד -
- * לא מחזיקה שום הפניה חיה ללוח (Board) או לכלים (Piece) עצמם.
- */
 @Getter
 public class BoardSnapshot {
     private final int rows;

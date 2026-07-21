@@ -29,7 +29,6 @@ public class InputHandler {
         while (scanner.hasNextLine()) {
             String line = scanner.nextLine().trim();
             
-            // אם הגענו לסוף הקלט או שורה שמסמנת סיום, אפשר לצאת כדי למנוע תקיעה
             if (line.equalsIgnoreCase("exit") || line.equalsIgnoreCase("end")) {
                 break;
             }
@@ -63,7 +62,6 @@ public class InputHandler {
                     registry.dispatch(parts[0], parts);
                 }
                 
-                // פתרון מיוחד לתקיעה: אם הרצנו את פקודת ההדפסה, נעצור את הלולאה ונציג את הלוח מיידית
                 if (parts.length > 0 && parts[0].equals("print")) {
                     break;
                 }

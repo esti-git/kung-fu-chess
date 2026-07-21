@@ -6,10 +6,6 @@ import events.Event;
 import events.EventBus;
 import events.PieceCapturedEvent;
 
-/**
- * Subscribes to {@link PieceCapturedEvent} on the {@link EventBus} and keeps a running score -
- * does not receive any direct call from the move/capture execution code itself.
- */
 public class ScoreTracker {
 
     private int whiteScore;
@@ -22,7 +18,6 @@ public class ScoreTracker {
     public int getWhiteScore() { return whiteScore; }
     public int getBlackScore() { return blackScore; }
 
-    /** מנקה את הניקוד - חובה לקרוא כשמתחילים משחק חדש */
     public void reset() {
         whiteScore = 0;
         blackScore = 0;
@@ -31,7 +26,7 @@ public class ScoreTracker {
     private void onPieceCaptured(Event event) {
         PieceCapturedEvent captured = (PieceCapturedEvent) event;
         int value = pointValue(captured.getCapturedKind());
-        // מי שנתפס מפסיד את הנקודות, הצד השני מקבל אותן
+
         if (captured.getCapturedColor() == PieceColor.WHITE) {
             blackScore += value;
         } else {

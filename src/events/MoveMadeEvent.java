@@ -5,7 +5,6 @@ import enums.PieceKind;
 import lombok.Getter;
 import model.Position;
 
-/** Published whenever a piece finishes landing on a square, from either a move or a jump. */
 @Getter
 public class MoveMadeEvent extends Event {
 

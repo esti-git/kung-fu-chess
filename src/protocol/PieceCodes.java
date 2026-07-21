@@ -3,7 +3,6 @@ package protocol;
 import enums.PieceColor;
 import enums.PieceKind;
 
-/** Single-character wire codes for color/kind, shared by move-command parsing (server) and building (client). */
 public class PieceCodes {
 
     public static char colorChar(PieceColor color) {

@@ -6,11 +6,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
-/**
- * Minimal thread-safe publish/subscribe bus. Listeners are stored per event type in a
- * CopyOnWriteArrayList so publish() can safely iterate while another thread subscribes or
- * unsubscribes concurrently.
- */
 public class EventBus {
 
     private final Map<String, CopyOnWriteArrayList<Consumer<Event>>> listeners = new ConcurrentHashMap<>();

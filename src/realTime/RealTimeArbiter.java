@@ -63,12 +63,10 @@ public class RealTimeArbiter {
         return winnerColor;
     }
 
-    /** יומן תפיסות מצטבר - נשמר גם אחרי שכלי כבר לא בלוח, כדי שהצופה בניקוד לא יצטרך לגעת בלוח/בכלים חיים */
     public List<CaptureRecord> getCaptureLog() {
         return Collections.unmodifiableList(captureLog);
     }
 
-    /** מנקה תנועות/קפיצות/מנוחות/יומן תפיסות פעילים - לשימוש כשמתחילים משחק חדש על אותו לוח */
     public void reset() {
         activeMoves.clear();
         activeJumps.clear();
@@ -181,7 +179,7 @@ public class RealTimeArbiter {
         boolean kingCaptured = false;
         if (target != null) {
             if (target.getState() == PieceState.JUMPING) {
-                // הכלי באוויר - לא נתפס עכשיו, רק מתפנה מהמשבצת עד שינחת; הוא זה שיתפוס את מי שינחת עליו
+
                 board.clearCellOnly(destination);
             } else {
                 board.removePiece(destination);
@@ -217,7 +215,7 @@ public class RealTimeArbiter {
         if (existingPiece == null) {
             board.addPiece(jumpPosition, piece);
         } else if (existingPiece == piece) {
-            // הכלי לא הוסר מהלוח בזמן הקפיצה, אז הוא כבר נמצא במקום הנחיתה
+
         } else if (existingPiece.getColor() != piece.getColor()) {
             board.removePiece(jumpPosition);
             captureLog.add(new CaptureRecord(existingPiece.getColor(), existingPiece.getKind()));

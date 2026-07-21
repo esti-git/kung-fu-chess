@@ -12,10 +12,6 @@ import model.Position;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * בונה תמונת מצב קפואה של הלוח והפעולות הפעילות - זה היחיד שקורא ל-board.getPieceAt(...) לצורך התצוגה;
- * כל שאר קוד התצוגה (renderer, היסטוריית מהלכים, ניקוד) קורא רק מהתמונה הזו, לא מהלוח החי.
- */
 public class BoardSnapshotFactory {
 
     public BoardSnapshot capture(GameEngine engine) {

@@ -30,9 +30,9 @@ import java.awt.image.BufferedImage;
 public class BoardPrinter {
 
     private static final int HISTORY_PANEL_WIDTH = 190;
-    private static final Color FRAME_BACKGROUND = new Color(22, 22, 26); // תואם לצבע המסגרת מ-BoardRenderer, כדי שרצועות ה-letterbox סביב הלוח המוקטן לא יבלטו
-    private static final Color PANEL_BACKGROUND = new Color(26, 26, 30); // כהה, תואם למסגרת הכהה של הלוח
-    private static final Color PANEL_ACCENT = new Color(191, 155, 87); // אותו זהב/ברונזה כמו מסגרת הלוח - מאחד את העיצוב
+    private static final Color FRAME_BACKGROUND = new Color(22, 22, 26);
+    private static final Color PANEL_BACKGROUND = new Color(26, 26, 30);
+    private static final Color PANEL_ACCENT = new Color(191, 155, 87);
     private static final Color PANEL_TEXT = new Color(225, 222, 215);
     private static final Font MOVES_FONT = new Font("Consolas", Font.PLAIN, 14);
     private static final Font SCORE_FONT = new Font("Segoe UI", Font.BOLD, 18);
@@ -61,7 +61,7 @@ public class BoardPrinter {
     private JLabel blackScoreLabel;
     private int baselineWidth;
     private int baselineHeight;
-    private GameLoop gameLoop; // מריץ את לולאת הזמן-אמת של המשחק (קצב, שעון המנוע, restart)
+    private GameLoop gameLoop;
 
     public BoardPrinter(EventBus eventBus) {
         this.renderer = new BoardRenderer();
@@ -97,7 +97,6 @@ public class BoardPrinter {
         }
     }
 
-    /** מאפס את תצוגות ההיסטוריה והניקוד - נקרא לאחר שמשחק חדש מתחיל */
     public void resetTrackers() {
         historyTracker.reset();
         scoreTracker.reset();
@@ -117,7 +116,6 @@ public class BoardPrinter {
         }
     }
 
-    // הדפסה טקסטואלית לקונסול - קוראת רק מתמונת מצב, לא מהלוח החי
     public void printConsole() {
         if (engine == null) return;
         BoardSnapshot snapshot = snapshotFactory.capture(engine);
@@ -132,14 +130,12 @@ public class BoardPrinter {
         }
     }
 
-    // הדפסה גרפית לחלון והפעלת השעון בזמן אמת
     public void printGUI() {
         if (engine == null) return;
 
-        // אתחול חלון ה-GUI פעם אחת בלבד
         if (guiWindow == null) {
             initGUIWindow();
-            startGameLoop(); // הפעלת לולאת הזמן-אמת (GameLoop) ברקע
+            startGameLoop();
         } else {
             updateGUIImage();
         }
@@ -171,16 +167,13 @@ public class BoardPrinter {
             guiWindow.add(boardPanel, BorderLayout.CENTER);
             guiWindow.add(eastPanel, BorderLayout.EAST);
 
-            // מאזין עכבר לשליחת לחיצות - ממיר קודם את קואורדינטות הלחיצה (במרחב הפאנל המוקטן/מוגדל)
-            // בחזרה לקואורדינטות המקוריות של תמונת הלוח, כדי שמיפוי המשבצות ימשיך לעבוד נכון בכל גודל חלון
             boardPanel.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
                     if (registry == null) return;
                     Point imagePoint = boardPanel.panelToImage(e.getX(), e.getY());
-                    if (imagePoint == null) return; // הלחיצה נפלה מחוץ לתמונת הלוח (באזור ה-letterbox)
+                    if (imagePoint == null) return;
 
-                    // דאבל קליק על משבצת מפעיל קפיצה, קליק בודד מפעיל בחירה/תנועה רגילה
                     String commandType = (e.getClickCount() >= 2) ? "jump" : "click";
                     String[] commandParts = {
                         commandType,
@@ -209,11 +202,6 @@ public class BoardPrinter {
         });
     }
 
-    /**
-     * כשהחלון משנה גודל, מקטין/מגדיל את רוחב פאנלי הצדדים ואת גודל הגופנים שלהם
-     * באותו יחס שבו החלון עצמו השתנה - כך שהלוח (שמתאים עצמו אוטומטית לשטח שנשאר) ורשימות
-     * המהלכים/הניקוד גדלים ומצטמצמים יחד, ושום דבר לא נחתך.
-     */
     private void rescaleSidePanels() {
         if (baselineWidth <= 0 || baselineHeight <= 0 || westPanel == null || eastPanel == null) return;
 
@@ -325,9 +313,6 @@ public class BoardPrinter {
         g.dispose();
     }
 
-    /**
-     * מאציל את הרצת הזמן-אמת (קצב, שעון המנוע, restart) ל-GameLoop; ה-printer רק מצייר בכל טיק
-     */
     private void startGameLoop() {
         gameLoop = new GameLoop(engine, this::updateGUIImage);
         gameLoop.setRestartAction(restartAction);

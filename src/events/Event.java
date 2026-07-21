@@ -1,6 +1,5 @@
 package events;
 
-/** Base class for everything published on the {@link EventBus}. */
 public abstract class Event {
 
     private final String type;

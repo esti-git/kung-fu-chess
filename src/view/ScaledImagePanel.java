@@ -9,10 +9,6 @@ import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 
-/**
- * פאנל שמצייר תמונה נתונה כשהיא מוקטנת/מוגדלת כדי להתאים בדיוק לגודל הפאנל הנוכחי,
- * תוך שמירה על יחס הגובה-רוחב המקורי (letterboxing) - כך שהלוח לעולם לא נחתך ולא מתעוות.
- */
 public class ScaledImagePanel extends JPanel {
 
     private BufferedImage image;
@@ -29,7 +25,6 @@ public class ScaledImagePanel extends JPanel {
         return super.getPreferredSize();
     }
 
-    /** מחשב את המלבן (במרחב הפאנל) שבו התמונה בפועל מצוירת, לאחר קנה המידה וההמרכוז */
     private Rectangle computeDisplayRect() {
         int panelW = getWidth();
         int panelH = getHeight();
@@ -48,11 +43,6 @@ public class ScaledImagePanel extends JPanel {
         return new Rectangle(x, y, drawW, drawH);
     }
 
-    /**
-     * ממיר נקודת לחיצה במרחב הפאנל (כפי שהמשתמש רואה, לאחר קנה המידה הנוכחי) חזרה
-     * למרחב הפיקסלים המקורי של תמונת הלוח - כדי שמיפוי הלחיצות למשבצות ימשיך לעבוד נכון.
-     * מחזיר null אם הלחיצה נפלה מחוץ לתמונה עצמה (באזור ה-letterbox).
-     */
     public Point panelToImage(int panelX, int panelY) {
         if (image == null) return null;
         Rectangle rect = computeDisplayRect();
