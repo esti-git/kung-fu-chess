@@ -159,6 +159,48 @@ public class StateCodec {
         return root.toString();
     }
 
+    public static String encodeJoin(String username) {
+        JSONObject root = new JSONObject();
+        root.put("type", "join");
+        root.put("username", username);
+        return root.toString();
+    }
+
+    public static String decodeJoinUsername(String rawJson) {
+        return new JSONObject(rawJson).optString("username", "");
+    }
+
+    public static String encodeAssign(PieceColor color, String whiteName, String blackName) {
+        JSONObject root = new JSONObject();
+        root.put("type", "assign");
+        root.put("color", color.name());
+        root.put("whiteName", whiteName == null ? JSONObject.NULL : whiteName);
+        root.put("blackName", blackName == null ? JSONObject.NULL : blackName);
+        return root.toString();
+    }
+
+    public static AssignedIdentity decodeAssign(String rawJson) {
+        JSONObject root = new JSONObject(rawJson);
+        PieceColor color = PieceColor.valueOf(root.getString("color"));
+        String whiteName = root.isNull("whiteName") ? null : root.getString("whiteName");
+        String blackName = root.isNull("blackName") ? null : root.getString("blackName");
+        return new AssignedIdentity(color, whiteName, blackName);
+    }
+
+    public static String encodeRejected(String message) {
+        JSONObject root = new JSONObject();
+        root.put("type", "rejected");
+        root.put("message", message);
+        return root.toString();
+    }
+
+    public static String encodeOpponentDisconnected(String message) {
+        JSONObject root = new JSONObject();
+        root.put("type", "opponentDisconnected");
+        root.put("message", message);
+        return root.toString();
+    }
+
     public static String peekType(String rawJson) {
         try {
             return new JSONObject(rawJson).optString("type", null);

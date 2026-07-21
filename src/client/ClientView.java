@@ -10,6 +10,7 @@ import events.GameStartedEvent;
 import events.MoveMadeEvent;
 import events.PieceCapturedEvent;
 import model.Position;
+import protocol.AssignedIdentity;
 import protocol.JumpCommand;
 import protocol.MoveCommand;
 import protocol.NetworkState;
@@ -26,6 +27,7 @@ import view.ScoreTracker;
 import javax.swing.BorderFactory;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -74,6 +76,12 @@ public class ClientView {
     private GameClient client;
     private volatile BoardSnapshot latestSnapshot;
     private Position selected;
+
+    private PieceColor myColor;
+    private String whiteName;
+    private String blackName;
+    private volatile boolean gameOver;
+    private boolean disconnectNotified;
 
     private JFrame guiWindow;
     private JPanel westPanel;
@@ -148,6 +156,7 @@ public class ClientView {
             guiWindow.setVisible(true);
             repaintBoard();
             updateHistoryPanels();
+            applyIdentityLabels();
         });
     }
 
@@ -162,6 +171,59 @@ public class ClientView {
 
     public void onEvent(Event event) {
         eventBus.publish(event);
+    }
+
+    public void onAssign(AssignedIdentity identity) {
+        this.myColor = identity.color;
+        this.whiteName = identity.whiteName;
+        this.blackName = identity.blackName;
+        SwingUtilities.invokeLater(this::applyIdentityLabels);
+    }
+
+    public void onRejected(String message) {
+        System.err.println("Join rejected: " + message);
+        System.exit(0);
+    }
+
+    public void onOpponentDisconnected(String message) {
+        gameOver = true;
+        showGameOverOnce(message);
+    }
+
+    /** Fires whenever the socket closes, whether the server tore it down after a disconnect or it dropped
+     *  for any other reason - either way the game is over and the board becomes view-only. */
+    public void onConnectionClosed(String reason) {
+        gameOver = true;
+        showGameOverOnce((reason == null || reason.isBlank()) ? "Connection closed. Game over." : reason);
+    }
+
+    private void showGameOverOnce(String message) {
+        SwingUtilities.invokeLater(() -> {
+            if (disconnectNotified) return;
+            disconnectNotified = true;
+            System.out.println(message);
+            if (guiWindow != null) {
+                JOptionPane.showMessageDialog(guiWindow, message, "Game Over", JOptionPane.INFORMATION_MESSAGE);
+            }
+        });
+    }
+
+    private void applyIdentityLabels() {
+        if (guiWindow == null || whiteBorder == null || blackBorder == null) return;
+
+        String white = whiteName == null ? "waiting..." : whiteName;
+        String black = blackName == null ? "waiting..." : blackName;
+        whiteBorder.setTitle("White - " + white);
+        blackBorder.setTitle("Black - " + black);
+
+        if (myColor != null) {
+            String you = myColor == PieceColor.WHITE ? "White" : "Black";
+            String yourName = myColor == PieceColor.WHITE ? white : black;
+            guiWindow.setTitle("Kung Fu Chess - " + you + " (" + yourName + ")");
+        }
+
+        westPanel.repaint();
+        eastPanel.repaint();
     }
 
     private void refreshHistoryPanelsOnEdt() {
@@ -181,7 +243,7 @@ public class ClientView {
 
     private void handleClick(int pixelX, int pixelY) {
         BoardSnapshot snapshot = latestSnapshot;
-        if (snapshot == null || client == null) return;
+        if (snapshot == null || client == null || gameOver) return;
 
         Position clicked = pixelToCell(pixelX, pixelY, snapshot.getRows(), snapshot.getCols());
         if (clicked == null) return;
@@ -215,7 +277,7 @@ public class ClientView {
     /** Mirrors input.Controller#jump: a double-click jumps the piece under the cursor in place, bypassing selection. */
     private void handleDoubleClick(int pixelX, int pixelY) {
         BoardSnapshot snapshot = latestSnapshot;
-        if (snapshot == null || client == null) return;
+        if (snapshot == null || client == null || gameOver) return;
 
         Position clicked = pixelToCell(pixelX, pixelY, snapshot.getRows(), snapshot.getCols());
         if (clicked == null) return;

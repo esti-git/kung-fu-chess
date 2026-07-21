@@ -11,21 +11,33 @@ import java.util.function.Consumer;
 /** Thin WebSocket connection to the game server - no game logic lives here, only message routing. */
 public class GameClient extends WebSocketClient {
 
+    private final String username;
     private final Consumer<protocol.NetworkState> onState;
     private final Consumer<String> onError;
     private final Consumer<Event> onEvent;
+    private final Consumer<protocol.AssignedIdentity> onAssign;
+    private final Consumer<String> onRejected;
+    private final Consumer<String> onOpponentDisconnected;
+    private final Consumer<String> onConnectionClosed;
 
-    public GameClient(URI serverUri, Consumer<protocol.NetworkState> onState, Consumer<String> onError,
-                       Consumer<Event> onEvent) {
+    public GameClient(URI serverUri, String username, Consumer<protocol.NetworkState> onState, Consumer<String> onError,
+                       Consumer<Event> onEvent, Consumer<protocol.AssignedIdentity> onAssign, Consumer<String> onRejected,
+                       Consumer<String> onOpponentDisconnected, Consumer<String> onConnectionClosed) {
         super(serverUri);
+        this.username = username;
         this.onState = onState;
         this.onError = onError;
         this.onEvent = onEvent;
+        this.onAssign = onAssign;
+        this.onRejected = onRejected;
+        this.onOpponentDisconnected = onOpponentDisconnected;
+        this.onConnectionClosed = onConnectionClosed;
     }
 
     @Override
     public void onOpen(ServerHandshake handshake) {
         System.out.println("Connected to game server");
+        send(StateCodec.encodeJoin(username));
     }
 
     @Override
@@ -37,12 +49,19 @@ public class GameClient extends WebSocketClient {
             onError.accept(StateCodec.decodeErrorMessage(message));
         } else if ("event".equals(type)) {
             onEvent.accept(StateCodec.decodeEvent(message));
+        } else if ("assign".equals(type)) {
+            onAssign.accept(StateCodec.decodeAssign(message));
+        } else if ("rejected".equals(type)) {
+            onRejected.accept(StateCodec.decodeErrorMessage(message));
+        } else if ("opponentDisconnected".equals(type)) {
+            onOpponentDisconnected.accept(StateCodec.decodeErrorMessage(message));
         }
     }
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
         System.out.println("Disconnected from game server: " + reason);
+        onConnectionClosed.accept(reason);
     }
 
     @Override

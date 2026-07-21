@@ -2,6 +2,7 @@ package server;
 
 import common.GameResult;
 import engine.GameEngine;
+import enums.PieceColor;
 import events.Event;
 import events.EventBus;
 import events.GameEndedEvent;
@@ -40,6 +41,11 @@ public class GameServer extends WebSocketServer {
     private boolean gameOverHandled;
     private long gameOverAtMillis;
 
+    private PlayerSession whiteSession;
+    private PlayerSession blackSession;
+    private WebSocket whiteConn;
+    private WebSocket blackConn;
+
     public GameServer(int port, GameFactory factory) {
         super(new InetSocketAddress(port));
         this.factory = factory;
@@ -67,11 +73,44 @@ public class GameServer extends WebSocketServer {
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
         System.out.println("Client disconnected: " + conn.getRemoteSocketAddress());
+        synchronized (engineLock) {
+            WebSocket remaining;
+            if (conn == whiteConn) {
+                remaining = blackConn;
+            } else if (conn == blackConn) {
+                remaining = whiteConn;
+            } else {
+                return;
+            }
+
+            // Clear slots first so any in-flight move/jump from the remaining client is rejected
+            // by isAuthorized() even if it arrives before the close() below takes effect.
+            whiteConn = null;
+            blackConn = null;
+            whiteSession = null;
+            blackSession = null;
+
+            if (remaining != null) {
+                String message = "Opponent disconnected. Game over.";
+                remaining.send(StateCodec.encodeOpponentDisconnected(message));
+                remaining.close(1000, message);
+            }
+
+            factory.restartGame();
+            gameOverHandled = false;
+        }
+        broadcastState();
     }
 
     @Override
     public void onMessage(WebSocket conn, String message) {
         String trimmed = message.trim();
+        if (trimmed.startsWith("{")) {
+            synchronized (engineLock) {
+                handleControlMessage(conn, trimmed);
+            }
+            return;
+        }
         synchronized (engineLock) {
             if (JumpCommand.isJumpCommand(trimmed)) {
                 if (!handleJump(conn, trimmed)) return;
@@ -82,11 +121,51 @@ public class GameServer extends WebSocketServer {
         broadcastState();
     }
 
+    /** Caller must hold engineLock. */
+    private void handleControlMessage(WebSocket conn, String message) {
+        if ("join".equals(StateCodec.peekType(message))) {
+            handleJoin(conn, StateCodec.decodeJoinUsername(message));
+        }
+    }
+
+    /** Caller must hold engineLock. Assigns White/Black by join order; a third joiner is rejected. */
+    private void handleJoin(WebSocket conn, String username) {
+        String name = (username == null || username.isBlank()) ? "Player" : username;
+
+        if (whiteSession == null) {
+            whiteSession = new PlayerSession(name, PieceColor.WHITE);
+            whiteConn = conn;
+        } else if (blackSession == null) {
+            blackSession = new PlayerSession(name, PieceColor.BLACK);
+            blackConn = conn;
+        } else {
+            conn.send(StateCodec.encodeRejected("Game already has two players."));
+            conn.close();
+            return;
+        }
+
+        String whiteName = whiteSession == null ? null : whiteSession.username;
+        String blackName = blackSession == null ? null : blackSession.username;
+        if (whiteConn != null) whiteConn.send(StateCodec.encodeAssign(PieceColor.WHITE, whiteName, blackName));
+        if (blackConn != null) blackConn.send(StateCodec.encodeAssign(PieceColor.BLACK, whiteName, blackName));
+    }
+
+    /** True if conn is the currently registered connection for that color. Guards against stale/in-flight
+     *  commands from a connection whose slot was just cleared (e.g. by a disconnect teardown). */
+    private boolean isAuthorized(WebSocket conn, PieceColor color) {
+        return (color == PieceColor.WHITE && conn == whiteConn) || (color == PieceColor.BLACK && conn == blackConn);
+    }
+
     /** Caller must hold engineLock. Returns false (and reports the error) if the command was rejected. */
     private boolean handleMove(WebSocket conn, String message) {
         MoveCommand command = MoveCommand.parse(message, engine.getState().getBoard().getRows());
         if (command == null) {
             conn.send(StateCodec.encodeError("Malformed command: " + message));
+            return false;
+        }
+
+        if (!isAuthorized(conn, command.color)) {
+            conn.send(StateCodec.encodeError("You can only move your own pieces."));
             return false;
         }
 
@@ -109,6 +188,11 @@ public class GameServer extends WebSocketServer {
         JumpCommand command = JumpCommand.parse(message, engine.getState().getBoard().getRows());
         if (command == null) {
             conn.send(StateCodec.encodeError("Malformed command: " + message));
+            return false;
+        }
+
+        if (!isAuthorized(conn, command.color)) {
+            conn.send(StateCodec.encodeError("You can only move your own pieces."));
             return false;
         }
 
