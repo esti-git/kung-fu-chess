@@ -21,11 +21,14 @@ public class GameClient extends WebSocketClient {
     private final Consumer<String> onOpponentDisconnected;
     private final Consumer<String> onConnectionClosed;
     private final Consumer<protocol.LoginResult> onLoginResult;
+    private final Consumer<String> onSeekTimeout;
+    private final Consumer<Integer> onDisconnectCountdown;
 
     public GameClient(URI serverUri, String username, String password, Consumer<protocol.NetworkState> onState,
                        Consumer<String> onError, Consumer<Event> onEvent, Consumer<protocol.AssignedIdentity> onAssign,
                        Consumer<String> onRejected, Consumer<String> onOpponentDisconnected,
-                       Consumer<String> onConnectionClosed, Consumer<protocol.LoginResult> onLoginResult) {
+                       Consumer<String> onConnectionClosed, Consumer<protocol.LoginResult> onLoginResult,
+                       Consumer<String> onSeekTimeout, Consumer<Integer> onDisconnectCountdown) {
         super(serverUri);
         this.username = username;
         this.password = password;
@@ -37,6 +40,8 @@ public class GameClient extends WebSocketClient {
         this.onOpponentDisconnected = onOpponentDisconnected;
         this.onConnectionClosed = onConnectionClosed;
         this.onLoginResult = onLoginResult;
+        this.onSeekTimeout = onSeekTimeout;
+        this.onDisconnectCountdown = onDisconnectCountdown;
     }
 
     @Override
@@ -62,6 +67,10 @@ public class GameClient extends WebSocketClient {
             onOpponentDisconnected.accept(StateCodec.decodeErrorMessage(message));
         } else if ("loginResult".equals(type)) {
             onLoginResult.accept(StateCodec.decodeLoginResult(message));
+        } else if ("seekTimeout".equals(type)) {
+            onSeekTimeout.accept(StateCodec.decodeErrorMessage(message));
+        } else if ("disconnectCountdown".equals(type)) {
+            onDisconnectCountdown.accept(StateCodec.decodeDisconnectCountdownSeconds(message));
         }
     }
 
@@ -74,6 +83,10 @@ public class GameClient extends WebSocketClient {
     @Override
     public void onError(Exception ex) {
         ex.printStackTrace();
+    }
+
+    public void sendSeek() {
+        send(StateCodec.encodeSeek());
     }
 
     public void sendMove(String command) {

@@ -26,6 +26,7 @@ import view.ScaledImagePanel;
 import view.ScoreTracker;
 
 import javax.swing.BorderFactory;
+import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -34,6 +35,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.border.TitledBorder;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -85,6 +87,11 @@ public class ClientView {
     private int blackRating = 1200;
     private volatile boolean gameOver;
     private boolean disconnectNotified;
+
+    private JDialog countdownDialog;
+    private JLabel countdownLabel;
+    private Timer countdownTimer;
+    private int countdownSecondsLeft;
 
     private JFrame guiWindow;
     private JPanel westPanel;
@@ -182,7 +189,57 @@ public class ClientView {
         this.blackName = identity.blackName;
         this.whiteRating = identity.whiteRating;
         this.blackRating = identity.blackRating;
-        SwingUtilities.invokeLater(this::applyIdentityLabels);
+        SwingUtilities.invokeLater(() -> {
+            dismissDisconnectCountdown();
+            applyIdentityLabels();
+        });
+    }
+
+    /** "disconnectCountdown" handler: the opponent's socket just dropped. Ticks a local countdown
+     *  down from the seconds the server sent; if the opponent reconnects, onAssign() dismisses
+     *  this dialog, otherwise the server's opponentDisconnected/connection-closed message follows
+     *  once the grace period elapses and drives the usual Game Over dialog. */
+    public void onDisconnectCountdown(int seconds) {
+        SwingUtilities.invokeLater(() -> {
+            countdownSecondsLeft = seconds;
+            if (countdownDialog == null) {
+                countdownDialog = new JDialog(guiWindow, "Opponent disconnected", false);
+                countdownLabel = new JLabel("", SwingConstants.CENTER);
+                countdownLabel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+                countdownDialog.add(countdownLabel);
+                countdownDialog.setMinimumSize(new Dimension(320, 100));
+                countdownDialog.setLocationRelativeTo(guiWindow);
+            }
+            updateCountdownLabel();
+            countdownDialog.setVisible(true);
+
+            if (countdownTimer != null) countdownTimer.stop();
+            countdownTimer = new Timer(1000, e -> {
+                countdownSecondsLeft--;
+                if (countdownSecondsLeft <= 0) {
+                    dismissDisconnectCountdown();
+                } else {
+                    updateCountdownLabel();
+                }
+            });
+            countdownTimer.start();
+        });
+    }
+
+    private void updateCountdownLabel() {
+        if (countdownLabel != null) {
+            countdownLabel.setText("Opponent disconnected. Auto-resign in " + countdownSecondsLeft + "s...");
+        }
+    }
+
+    private void dismissDisconnectCountdown() {
+        if (countdownTimer != null) {
+            countdownTimer.stop();
+            countdownTimer = null;
+        }
+        if (countdownDialog != null) {
+            countdownDialog.setVisible(false);
+        }
     }
 
     public void onRejected(String message) {
@@ -212,6 +269,7 @@ public class ClientView {
 
     private void showGameOverOnce(String message) {
         SwingUtilities.invokeLater(() -> {
+            dismissDisconnectCountdown();
             if (disconnectNotified) return;
             disconnectNotified = true;
             System.out.println(message);

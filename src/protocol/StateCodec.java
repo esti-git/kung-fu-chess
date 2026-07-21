@@ -227,6 +227,30 @@ public class StateCodec {
         return root.toString();
     }
 
+    public static String encodeSeek() {
+        JSONObject root = new JSONObject();
+        root.put("type", "seek");
+        return root.toString();
+    }
+
+    public static String encodeSeekTimeout(String message) {
+        JSONObject root = new JSONObject();
+        root.put("type", "seekTimeout");
+        root.put("message", message);
+        return root.toString();
+    }
+
+    public static String encodeDisconnectCountdown(int seconds) {
+        JSONObject root = new JSONObject();
+        root.put("type", "disconnectCountdown");
+        root.put("seconds", seconds);
+        return root.toString();
+    }
+
+    public static int decodeDisconnectCountdownSeconds(String rawJson) {
+        return new JSONObject(rawJson).optInt("seconds", 0);
+    }
+
     public static String peekType(String rawJson) {
         try {
             return new JSONObject(rawJson).optString("type", null);
