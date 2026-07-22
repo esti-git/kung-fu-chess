@@ -1,7 +1,6 @@
 package view;
 
 import javax.imageio.ImageIO;
-import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.geom.AffineTransform;
@@ -52,13 +51,6 @@ public class Img {
         return this;
     }
 
-    public Img read(String path) { return read(path, null, false, null); }
-
-    public Img wrap(BufferedImage image) {
-        this.img = image;
-        return this;
-    }
-
     public Img blank(int width, int height, Color bgColor) {
         img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         if (bgColor != null) {
@@ -82,33 +74,6 @@ public class Img {
         g.setComposite(AlphaComposite.SrcOver);
         g.drawImage(img, x, y, null);
         g.dispose();
-    }
-
-    public void putText(String txt, int x, int y, float fontSize,
-                        Color color, int thickness) {
-
-        if (img == null) throw new IllegalStateException("Image not loaded.");
-
-        Graphics2D g = img.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
-                           RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        g.setColor(color);
-        g.setFont(img.getGraphics().getFont().deriveFont(fontSize * 12));
-        g.drawString(txt, x, y);
-        g.dispose();
-    }
-
-    public void show() {
-        if (img == null) throw new IllegalStateException("Image not loaded.");
-
-        SwingUtilities.invokeLater(() -> {
-            JFrame f = new JFrame("Image");
-            f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            f.add(new JLabel(new ImageIcon(img)));
-            f.pack();
-            f.setLocationRelativeTo(null);
-            f.setVisible(true);
-        });
     }
 
     public BufferedImage get() { return img; }

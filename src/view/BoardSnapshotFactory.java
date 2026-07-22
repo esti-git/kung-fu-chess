@@ -1,13 +1,11 @@
 package view;
 
 import engine.GameEngine;
-import model.Board;
 import model.CaptureRecord;
 import model.PendingJump;
 import model.PendingMove;
 import model.PendingRest;
 import model.Piece;
-import model.Position;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,19 +13,11 @@ import java.util.List;
 public class BoardSnapshotFactory {
 
     public BoardSnapshot capture(GameEngine engine) {
-        Board board = engine.getState().getBoard();
-        int rows = board.getRows();
-        int cols = board.getCols();
+        int rows = engine.getBoardRows();
+        int cols = engine.getBoardCols();
 
         PieceSnapshot[][] cells = new PieceSnapshot[rows][cols];
-        for (int r = 0; r < rows; r++) {
-            for (int c = 0; c < cols; c++) {
-                Piece piece = board.getPieceAt(new Position(r, c));
-                if (piece != null) {
-                    cells[r][c] = toSnapshot(piece);
-                }
-            }
-        }
+        engine.forEachPiece((pos, piece) -> cells[pos.getRow()][pos.getCol()] = toSnapshot(piece));
 
         List<PendingMoveSnapshot> moveSnapshots = new ArrayList<>();
         for (PendingMove move : engine.getPendingMoves()) {

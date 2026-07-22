@@ -29,9 +29,7 @@ public class MoveCommand {
     }
 
     public static String squareName(int row, int col, int boardRows) {
-        char file = (char) ('a' + col);
-        int rank = boardRows - row;
-        return "" + file + rank;
+        return new Position(row, col).toAlgebraic(boardRows);
     }
 
     public static Position squareToPosition(String square, int boardRows) {

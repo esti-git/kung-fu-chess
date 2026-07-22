@@ -1,6 +1,6 @@
 import board.MatrixBoard;
 import config.GameConfig;
-import input.BoardMapper;
+import local.LocalBoardMapper;
 import model.Position;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,13 +12,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BoardMapperTest {
 
-    private BoardMapper mapper;
+    private LocalBoardMapper mapper;
 
     @BeforeEach
     void setUp() {
         MatrixBoard board = new MatrixBoard();
         board.initialize(Collections.emptyList(), 8, 8);
-        mapper = new BoardMapper(board);
+        mapper = new LocalBoardMapper(board);
     }
 
     @Test

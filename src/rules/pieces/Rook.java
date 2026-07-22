@@ -9,12 +9,16 @@ public class Rook extends Piece {
         super(id, color, PieceKind.ROOK, null);
     }
 
-    @Override public String getRepresentation() { return (getColor() == PieceColor.WHITE ? "w" : "b") + "R"; }
+    @Override protected char code() { return 'R'; }
 
     @Override
     public boolean isMovementPatternLegal(int fromRow, int fromCol, int toRow, int toCol, int totalRows) {
-        return fromRow == toRow || fromCol == toCol;
+        return isStraightLine(fromRow, fromCol, toRow, toCol);
     }
 
     @Override public boolean isSlidingPiece() { return true; }
+
+    static boolean isStraightLine(int fromRow, int fromCol, int toRow, int toCol) {
+        return fromRow == toRow || fromCol == toCol;
+    }
 }

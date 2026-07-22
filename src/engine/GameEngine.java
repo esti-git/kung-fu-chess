@@ -1,8 +1,8 @@
 package engine;
 
 import common.GameResult;
-import config.GameConfig;
 import enums.PieceColor;
+import model.Board;
 import model.CaptureRecord;
 import model.GameState;
 import model.Piece;
@@ -12,10 +12,10 @@ import model.PendingRest;
 import model.Position;
 import rules.RuleEngine;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 
 import realTime.RealTimeArbiter;
 
@@ -64,19 +64,19 @@ public class GameEngine {
     }
 
     public List<PendingMove> getPendingMoves() {
-        return (arbiter != null) ? arbiter.getActiveMoves() : new ArrayList<>();
+        return Collections.unmodifiableList(arbiter.getActiveMoves());
     }
 
     public List<PendingJump> getPendingJumps() {
-        return (arbiter != null) ? arbiter.getActiveJumps() : new ArrayList<>();
+        return Collections.unmodifiableList(arbiter.getActiveJumps());
     }
 
     public List<PendingRest> getPendingRests() {
-        return (arbiter != null) ? arbiter.getActiveRests() : new ArrayList<>();
+        return Collections.unmodifiableList(arbiter.getActiveRests());
     }
 
     public List<CaptureRecord> getCaptureLog() {
-        return (arbiter != null) ? arbiter.getCaptureLog() : Collections.emptyList();
+        return arbiter.getCaptureLog();
     }
 
     public Optional<Piece> pieceAt(Position pos) {
@@ -84,6 +84,27 @@ public class GameEngine {
             return Optional.empty();
         }
         return Optional.ofNullable(state.getBoard().getPieceAt(pos));
+    }
+
+    public int getBoardRows() {
+        return state.getBoard().getRows();
+    }
+
+    public int getBoardCols() {
+        return state.getBoard().getCols();
+    }
+
+    public void forEachPiece(BiConsumer<Position, Piece> consumer) {
+        Board board = state.getBoard();
+        for (int r = 0; r < board.getRows(); r++) {
+            for (int c = 0; c < board.getCols(); c++) {
+                Position pos = new Position(r, c);
+                Piece piece = board.getPieceAt(pos);
+                if (piece != null) {
+                    consumer.accept(pos, piece);
+                }
+            }
+        }
     }
 
     public void handleRawWait(String[] parts) {
@@ -135,12 +156,7 @@ public class GameEngine {
         if (!canPieceJump(pos.getRow(), pos.getCol()))
             return GameResult.fail("Jump is not currently possible");
 
-        if (arbiter != null) {
-            arbiter.startJump(currentPiece, pos);
-        } else {
-            getPendingJumps().add(new PendingJump(pos.getRow(), pos.getCol(), currentPiece, getGameClock()));
-            currentPiece.setState(enums.PieceState.JUMPING);
-        }
+        arbiter.startJump(currentPiece, pos);
 
         return GameResult.success();
     }
@@ -172,12 +188,6 @@ public class GameEngine {
         Position from = new Position(fromRow, fromCol);
         Position to = new Position(toRow, toCol);
 
-        if (arbiter != null) {
-            arbiter.startMove(piece, from, to);
-        } else {
-            int distance = Math.max(Math.abs(toRow - fromRow), Math.abs(toCol - fromCol));
-            long arrivalTime = getGameClock() + distance * GameConfig.MS_PER_CELL;
-            getPendingMoves().add(new PendingMove(fromRow, fromCol, toRow, toCol, piece, arrivalTime));
-        }
+        arbiter.startMove(piece, from, to);
     }
 }

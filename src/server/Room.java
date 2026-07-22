@@ -4,6 +4,7 @@ import common.GameResult;
 import config.GameConfig;
 import engine.GameEngine;
 import enums.PieceColor;
+import enums.PieceKind;
 import enums.PlayerRole;
 import events.Event;
 import events.EventBus;
@@ -11,7 +12,7 @@ import events.GameEndedEvent;
 import events.GameStartedEvent;
 import events.MoveMadeEvent;
 import events.PieceCapturedEvent;
-import input.GameFactory;
+import engine.GameFactory;
 import model.Piece;
 import org.java_websocket.WebSocket;
 import protocol.JumpCommand;
@@ -33,11 +34,10 @@ import java.util.concurrent.TimeUnit;
 public class Room {
 
     public final String roomId;
-    private final GameSource source;
 
     private final GameFactory factory;
     private final GameEngine engine;
-    private final PlayerRepository repository;
+    private final RatingService ratingService;
     private final BoardSnapshotFactory snapshotFactory;
     private final ScheduledExecutorService scheduler;
     private final Object engineLock = new Object();
@@ -51,11 +51,10 @@ public class Room {
     private WebSocket blackConn;
     private final Map<WebSocket, PlayerSession> spectators = new LinkedHashMap<>();
 
-    public Room(String roomId, GameSource source, PlayerRepository repository,
+    public Room(String roomId, PlayerRepository repository,
                 ScheduledExecutorService scheduler, BoardSnapshotFactory snapshotFactory) {
         this.roomId = roomId;
-        this.source = source;
-        this.repository = repository;
+        this.ratingService = new RatingService(repository);
         this.scheduler = scheduler;
         this.snapshotFactory = snapshotFactory;
 
@@ -246,15 +245,7 @@ public class Room {
         }
         ratingsAppliedForCurrentGame = true;
 
-        PlayerSession winner = winnerColor == PieceColor.WHITE ? whiteSession : blackSession;
-        PlayerSession loser = winnerColor == PieceColor.WHITE ? blackSession : whiteSession;
-
-        int[] updated = EloCalculator.computeNewRatings(winner.getRating(), loser.getRating());
-        winner.setRating(updated[0]);
-        loser.setRating(updated[1]);
-
-        repository.updateRating(winner.getUsername(), winner.getRating());
-        repository.updateRating(loser.getUsername(), loser.getRating());
+        ratingService.applyGameEnd(winnerColor, whiteSession, blackSession);
 
         broadcastAssignments();
     }
@@ -270,12 +261,9 @@ public class Room {
 
     public boolean handleMove(WebSocket conn, String message) {
         synchronized (engineLock) {
-            if (isPausedForDisconnect()) {
-                conn.send(StateCodec.encodeError("Waiting for opponent to reconnect..."));
-                return false;
-            }
+            if (rejectIfPausedForDisconnect(conn)) return false;
 
-            MoveCommand command = MoveCommand.parse(message, engine.getState().getBoard().getRows());
+            MoveCommand command = MoveCommand.parse(message, engine.getBoardRows());
             if (command == null) {
                 conn.send(StateCodec.encodeError("Malformed command: " + message));
                 return false;
@@ -286,29 +274,19 @@ public class Room {
                 return false;
             }
 
-            Optional<Piece> piece = engine.pieceAt(command.from);
-            if (!piece.isPresent() || piece.get().getColor() != command.color || piece.get().getKind() != command.kind) {
-                conn.send(StateCodec.encodeError("No matching piece at source square"));
+            if (!piecePresentAndMatches(engine.pieceAt(command.from), command.color, command.kind, conn, "No matching piece at source square")) {
                 return false;
             }
 
-            GameResult<Void> result = engine.requestMove(command.from, command.to);
-            if (!result.isSuccess()) {
-                conn.send(StateCodec.encodeError(result.message()));
-                return false;
-            }
-            return true;
+            return respondToResult(conn, engine.requestMove(command.from, command.to));
         }
     }
 
     public boolean handleJump(WebSocket conn, String message) {
         synchronized (engineLock) {
-            if (isPausedForDisconnect()) {
-                conn.send(StateCodec.encodeError("Waiting for opponent to reconnect..."));
-                return false;
-            }
+            if (rejectIfPausedForDisconnect(conn)) return false;
 
-            JumpCommand command = JumpCommand.parse(message, engine.getState().getBoard().getRows());
+            JumpCommand command = JumpCommand.parse(message, engine.getBoardRows());
             if (command == null) {
                 conn.send(StateCodec.encodeError("Malformed command: " + message));
                 return false;
@@ -319,19 +297,36 @@ public class Room {
                 return false;
             }
 
-            Optional<Piece> piece = engine.pieceAt(command.position);
-            if (!piece.isPresent() || piece.get().getColor() != command.color || piece.get().getKind() != command.kind) {
-                conn.send(StateCodec.encodeError("No matching piece at jump square"));
+            if (!piecePresentAndMatches(engine.pieceAt(command.position), command.color, command.kind, conn, "No matching piece at jump square")) {
                 return false;
             }
 
-            GameResult<Void> result = engine.requestJump(command.position);
-            if (!result.isSuccess()) {
-                conn.send(StateCodec.encodeError(result.message()));
-                return false;
-            }
+            return respondToResult(conn, engine.requestJump(command.position));
+        }
+    }
+
+    private boolean rejectIfPausedForDisconnect(WebSocket conn) {
+        if (isPausedForDisconnect()) {
+            conn.send(StateCodec.encodeError("Waiting for opponent to reconnect..."));
             return true;
         }
+        return false;
+    }
+
+    private boolean piecePresentAndMatches(Optional<Piece> piece, PieceColor color, PieceKind kind, WebSocket conn, String noPieceMessage) {
+        if (!piece.isPresent() || piece.get().getColor() != color || piece.get().getKind() != kind) {
+            conn.send(StateCodec.encodeError(noPieceMessage));
+            return false;
+        }
+        return true;
+    }
+
+    private boolean respondToResult(WebSocket conn, GameResult<Void> result) {
+        if (!result.isSuccess()) {
+            conn.send(StateCodec.encodeError(result.message()));
+            return false;
+        }
+        return true;
     }
 
     public void tick(long now, long elapsed) {

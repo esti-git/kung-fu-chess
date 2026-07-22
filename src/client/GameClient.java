@@ -1,9 +1,15 @@
 package client;
 
 import client.logging.ClientLog;
+import enums.PieceColor;
+import enums.PieceKind;
 import events.Event;
+import model.Position;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
+import protocol.JumpCommand;
+import protocol.MoveCommand;
+import protocol.PieceCodes;
 import protocol.RoomJoined;
 import protocol.SpectateInfo;
 import protocol.StateCodec;
@@ -124,11 +130,14 @@ public class GameClient extends WebSocketClient {
         send(StateCodec.encodeJoinRoom(roomId));
     }
 
-    public void sendMove(String command) {
+    public void sendMove(PieceColor color, PieceKind kind, Position from, Position to, int boardRows) {
+        String command = "" + PieceCodes.colorChar(color) + PieceCodes.kindChar(kind)
+                + MoveCommand.squareName(from.getRow(), from.getCol(), boardRows)
+                + MoveCommand.squareName(to.getRow(), to.getCol(), boardRows);
         send(command);
     }
 
-    public void sendJump(String command) {
-        send(command);
+    public void sendJump(PieceColor color, PieceKind kind, Position position, int boardRows) {
+        send(JumpCommand.build(color, kind, position.getRow(), position.getCol(), boardRows));
     }
 }

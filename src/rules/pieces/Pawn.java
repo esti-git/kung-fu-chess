@@ -14,11 +14,11 @@ public class Pawn extends Piece {
         super(id, color, PieceKind.PAWN, null);
     }
 
-    @Override public String getRepresentation() { return (getColor() == PieceColor.WHITE ? "w" : "b") + "P"; }
+    @Override protected char code() { return 'P'; }
 
     @Override
     public boolean isMovementPatternLegal(int fromRow, int fromCol, int toRow, int toCol, int totalRows) {
-        int deltaCol = Math.abs(toCol - fromCol);
+        int deltaCol = colDelta(fromCol, toCol);
         int expectedRowDirection = (getColor() == PieceColor.WHITE) ? -1 : 1;
         int actualRowDirection = toRow - fromRow;
         int startRow = (getColor() == PieceColor.WHITE) ? (totalRows - 2) : 1;
@@ -37,7 +37,7 @@ public class Pawn extends Piece {
         int toRow = destination.getRow();
         int toCol = destination.getCol();
 
-        int deltaCol = Math.abs(toCol - fromCol);
+        int deltaCol = colDelta(fromCol, toCol);
         int expectedRowDirection = (getColor() == PieceColor.WHITE) ? -1 : 1;
         int actualRowDirection = toRow - fromRow;
 

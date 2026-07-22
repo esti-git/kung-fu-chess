@@ -1,15 +1,14 @@
-package input;
+package local;
 
 import engine.GameEngine;
-import view.BoardPrinter;
 
-public class CommandRegistry {
+public class LocalCommandRegistry {
 
-    private final Controller controller;
+    private final LocalController controller;
     private final GameEngine engine;
-    private final BoardPrinter printer;
+    private final LocalBoardPrinter printer;
 
-    public CommandRegistry(Controller controller, GameEngine engine, BoardPrinter printer) {
+    public LocalCommandRegistry(LocalController controller, GameEngine engine, LocalBoardPrinter printer) {
         this.controller = controller;
         this.engine = engine;
         this.printer = printer;

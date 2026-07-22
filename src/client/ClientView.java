@@ -2,7 +2,6 @@ package client;
 
 import audio.SoundManager;
 import client.logging.ClientLog;
-import config.GameConfig;
 import enums.PieceColor;
 import events.Event;
 import events.EventBus;
@@ -10,13 +9,9 @@ import events.GameEndedEvent;
 import events.GameStartedEvent;
 import events.MoveMadeEvent;
 import events.PieceCapturedEvent;
-import model.Position;
 import protocol.AssignedIdentity;
-import protocol.JumpCommand;
 import protocol.LoginResult;
-import protocol.MoveCommand;
 import protocol.NetworkState;
-import protocol.PieceCodes;
 import protocol.RoomJoined;
 import protocol.SpectateInfo;
 import view.BoardRenderer;
@@ -24,9 +19,9 @@ import view.BoardSnapshot;
 import view.GameAnimationController;
 import view.Img;
 import view.MoveHistoryTracker;
-import view.PieceSnapshot;
 import view.ScaledImagePanel;
 import view.ScoreTracker;
+import view.SidePanelFactory;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -35,7 +30,6 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
@@ -46,26 +40,16 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Graphics2D;
-import java.awt.Insets;
-import java.awt.RenderingHints;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.image.BufferedImage;
 
 public class ClientView {
 
-    private static final int HISTORY_PANEL_WIDTH = 190;
-    private static final Color FRAME_BACKGROUND = new Color(22, 22, 26);
-    private static final Color PANEL_BACKGROUND = new Color(26, 26, 30);
-    private static final Color PANEL_ACCENT = new Color(191, 155, 87);
-    private static final Color PANEL_TEXT = new Color(225, 222, 215);
-    private static final Font MOVES_FONT = new Font("Consolas", Font.PLAIN, 14);
-    private static final Font SCORE_FONT = new Font("Segoe UI", Font.BOLD, 18);
-    private static final Font TITLE_FONT = new Font("Segoe UI", Font.BOLD, 15);
+    private static final Color FRAME_BACKGROUND = SidePanelFactory.FRAME_BACKGROUND;
+    private static final Color PANEL_ACCENT = SidePanelFactory.PANEL_ACCENT;
+    private static final Font TITLE_FONT = SidePanelFactory.TITLE_FONT;
 
     private final BoardRenderer renderer = new BoardRenderer();
     private final ScaledImagePanel boardPanel = new ScaledImagePanel();
@@ -77,7 +61,7 @@ public class ClientView {
 
     private GameClient client;
     private volatile BoardSnapshot latestSnapshot;
-    private Position selected;
+    private final ClientController controller = new ClientController();
 
     private PieceColor myColor;
     private String whiteName;
@@ -135,15 +119,15 @@ public class ClientView {
             guiWindow.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             boardPanel.setBackground(FRAME_BACKGROUND);
 
-            whiteMovesArea = createMovesArea();
-            blackMovesArea = createMovesArea();
-            whiteScoreLabel = createScoreLabel();
-            blackScoreLabel = createScoreLabel();
-            whiteBorder = createTitledBorder("White");
-            blackBorder = createTitledBorder("Black");
+            whiteMovesArea = SidePanelFactory.createMovesArea();
+            blackMovesArea = SidePanelFactory.createMovesArea();
+            whiteScoreLabel = SidePanelFactory.createScoreLabel("Score: 0");
+            blackScoreLabel = SidePanelFactory.createScoreLabel("Score: 0");
+            whiteBorder = SidePanelFactory.createTitledBorder("White");
+            blackBorder = SidePanelFactory.createTitledBorder("Black");
 
-            westPanel = buildSidePanel(whiteBorder, whiteMovesArea, whiteScoreLabel);
-            eastPanel = buildSidePanel(blackBorder, blackMovesArea, blackScoreLabel);
+            westPanel = SidePanelFactory.buildSidePanel(whiteBorder, whiteMovesArea, whiteScoreLabel);
+            eastPanel = SidePanelFactory.buildSidePanel(blackBorder, blackMovesArea, blackScoreLabel);
 
             roomLabel = new JLabel(" ", SwingConstants.CENTER);
             roomLabel.setFont(TITLE_FONT);
@@ -365,148 +349,28 @@ public class ClientView {
     private void repaintBoard() {
         BoardSnapshot snapshot = latestSnapshot;
         if (snapshot == null) return;
-        Img visualBoard = renderer.render(snapshot, selected);
+        Img visualBoard = renderer.render(snapshot, controller.getSelected());
         if (animationController.isShowingGameOverOverlay()) {
-            drawGameOverOverlay(visualBoard.get());
+            PieceColor winner = animationController.getWinnerColor();
+            String winnerText = winner == null ? null : (winner == PieceColor.WHITE ? "White" : "Black") + " wins!";
+            SidePanelFactory.drawGameOverOverlay(visualBoard.get(), "GAME OVER", winnerText);
         }
         boardPanel.setImage(visualBoard.get());
         boardPanel.repaint();
     }
 
     private void handleClick(int pixelX, int pixelY) {
-        BoardSnapshot snapshot = latestSnapshot;
-        if (snapshot == null || client == null || gameOver || spectator) return;
-
-        Position clicked = pixelToCell(pixelX, pixelY, snapshot.getRows(), snapshot.getCols());
-        if (clicked == null) return;
-
-        if (selected == null) {
-            if (snapshot.getPieceAt(clicked.getRow(), clicked.getCol()) != null) {
-                selected = clicked;
-            }
-            repaintBoard();
-            return;
-        }
-
-        if (selected.equals(clicked)) {
-            selected = null;
-            repaintBoard();
-            return;
-        }
-
-        PieceSnapshot selectedPiece = snapshot.getPieceAt(selected.getRow(), selected.getCol());
-        if (selectedPiece != null) {
-            String command = "" + PieceCodes.colorChar(selectedPiece.getColor()) + PieceCodes.kindChar(selectedPiece.getKind())
-                    + MoveCommand.squareName(selected.getRow(), selected.getCol(), snapshot.getRows())
-                    + MoveCommand.squareName(clicked.getRow(), clicked.getCol(), snapshot.getRows());
-            client.sendMove(command);
-        }
-
-        selected = null;
-        repaintBoard();
+        controller.handleClick(client, latestSnapshot, gameOver, spectator, pixelX, pixelY, this::repaintBoard);
     }
 
     private void handleDoubleClick(int pixelX, int pixelY) {
-        BoardSnapshot snapshot = latestSnapshot;
-        if (snapshot == null || client == null || gameOver || spectator) return;
-
-        Position clicked = pixelToCell(pixelX, pixelY, snapshot.getRows(), snapshot.getCols());
-        if (clicked == null) return;
-
-        PieceSnapshot piece = snapshot.getPieceAt(clicked.getRow(), clicked.getCol());
-        if (piece != null) {
-            String command = JumpCommand.build(piece.getColor(), piece.getKind(), clicked.getRow(), clicked.getCol(), snapshot.getRows());
-            client.sendJump(command);
-        }
-
-        selected = null;
-        repaintBoard();
-    }
-
-    private Position pixelToCell(int x, int y, int rows, int cols) {
-        int cellSize = GameConfig.CELL_SIZE;
-        int margin = GameConfig.BOARD_LABEL_MARGIN;
-
-        int adjustedX = x - margin;
-        int adjustedY = y - margin;
-        if (adjustedX < 0 || adjustedY < 0) return null;
-
-        int col = adjustedX / cellSize;
-        int row = adjustedY / cellSize;
-        if (row >= 0 && row < rows && col >= 0 && col < cols) {
-            return new Position(row, col);
-        }
-        return null;
+        controller.handleDoubleClick(client, latestSnapshot, gameOver, spectator, pixelX, pixelY, this::repaintBoard);
     }
 
     private void rescaleSidePanels() {
-        if (baselineWidth <= 0 || baselineHeight <= 0 || westPanel == null || eastPanel == null) return;
-
-        double scaleX = guiWindow.getWidth() / (double) baselineWidth;
-        double scaleY = guiWindow.getHeight() / (double) baselineHeight;
-        double scale = Math.max(0.5, Math.min(2.5, Math.min(scaleX, scaleY)));
-
-        int panelWidth = Math.max(90, (int) Math.round(HISTORY_PANEL_WIDTH * scale));
-        westPanel.setPreferredSize(new Dimension(panelWidth, 10));
-        eastPanel.setPreferredSize(new Dimension(panelWidth, 10));
-
-        float movesFontSize = (float) Math.max(9.0, MOVES_FONT.getSize() * scale);
-        float scoreFontSize = (float) Math.max(11.0, SCORE_FONT.getSize() * scale);
-        float titleFontSize = (float) Math.max(10.0, TITLE_FONT.getSize() * scale);
-
-        whiteMovesArea.setFont(MOVES_FONT.deriveFont(movesFontSize));
-        blackMovesArea.setFont(MOVES_FONT.deriveFont(movesFontSize));
-        whiteScoreLabel.setFont(SCORE_FONT.deriveFont(scoreFontSize));
-        blackScoreLabel.setFont(SCORE_FONT.deriveFont(scoreFontSize));
-        whiteBorder.setTitleFont(TITLE_FONT.deriveFont(titleFontSize));
-        blackBorder.setTitleFont(TITLE_FONT.deriveFont(titleFontSize));
-
-        guiWindow.revalidate();
-        guiWindow.repaint();
-    }
-
-    private JTextArea createMovesArea() {
-        JTextArea area = new JTextArea();
-        area.setEditable(false);
-        area.setFont(MOVES_FONT);
-        area.setBackground(PANEL_BACKGROUND);
-        area.setForeground(PANEL_TEXT);
-        area.setCaretColor(PANEL_TEXT);
-        area.setMargin(new Insets(8, 10, 8, 10));
-        return area;
-    }
-
-    private JLabel createScoreLabel() {
-        JLabel label = new JLabel("Score: 0");
-        label.setHorizontalAlignment(SwingConstants.CENTER);
-        label.setFont(SCORE_FONT);
-        label.setOpaque(true);
-        label.setBackground(PANEL_ACCENT);
-        label.setForeground(new Color(30, 28, 24));
-        label.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
-        return label;
-    }
-
-    private TitledBorder createTitledBorder(String title) {
-        TitledBorder titledBorder = BorderFactory.createTitledBorder(
-                BorderFactory.createLineBorder(PANEL_ACCENT, 2), title);
-        titledBorder.setTitleFont(TITLE_FONT);
-        titledBorder.setTitleColor(PANEL_ACCENT);
-        return titledBorder;
-    }
-
-    private JPanel buildSidePanel(TitledBorder titledBorder, JTextArea movesArea, JLabel scoreLabel) {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setPreferredSize(new Dimension(HISTORY_PANEL_WIDTH, 10));
-        panel.setBackground(PANEL_BACKGROUND);
-        panel.setBorder(titledBorder);
-
-        JScrollPane scrollPane = new JScrollPane(movesArea);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-
-        panel.add(scoreLabel, BorderLayout.NORTH);
-        panel.add(scrollPane, BorderLayout.CENTER);
-        return panel;
+        SidePanelFactory.rescaleSidePanels(guiWindow, baselineWidth, baselineHeight,
+                westPanel, eastPanel, whiteMovesArea, blackMovesArea,
+                whiteScoreLabel, blackScoreLabel, whiteBorder, blackBorder);
     }
 
     private void updateHistoryPanels() {
@@ -517,33 +381,5 @@ public class ClientView {
         blackMovesArea.setCaretPosition(blackMovesArea.getDocument().getLength());
         whiteScoreLabel.setText("Score: " + scoreTracker.getWhiteScore());
         blackScoreLabel.setText("Score: " + scoreTracker.getBlackScore());
-    }
-
-    private void drawGameOverOverlay(BufferedImage image) {
-        Graphics2D g = image.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        g.setColor(new Color(0, 0, 0, 160));
-        g.fillRect(0, 0, image.getWidth(), image.getHeight());
-        g.setColor(Color.WHITE);
-
-        String title = "GAME OVER";
-        g.setFont(g.getFont().deriveFont(Font.BOLD, 48f));
-        FontMetrics titleMetrics = g.getFontMetrics();
-        int titleX = (image.getWidth() - titleMetrics.stringWidth(title)) / 2;
-        int titleY = image.getHeight() / 2 - 10;
-        g.drawString(title, titleX, titleY);
-
-        PieceColor winner = animationController.getWinnerColor();
-        if (winner != null) {
-            String winnerText = (winner == PieceColor.WHITE ? "White" : "Black") + " wins!";
-            g.setFont(g.getFont().deriveFont(Font.BOLD, 28f));
-            FontMetrics winnerMetrics = g.getFontMetrics();
-            int winnerX = (image.getWidth() - winnerMetrics.stringWidth(winnerText)) / 2;
-            int winnerY = titleY + titleMetrics.getDescent() + winnerMetrics.getAscent() + 15;
-            g.drawString(winnerText, winnerX, winnerY);
-        }
-
-        g.dispose();
     }
 }

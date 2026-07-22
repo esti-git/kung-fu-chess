@@ -19,16 +19,8 @@ public class GameResult<T> {
         return message;
     }
 
-    public T data() {
-        return data;
-    }
-
     public static <T> GameResult<T> success() {
         return new GameResult<>(true, "ok", null);
-    }
-
-    public static <T> GameResult<T> success(T data) {
-        return new GameResult<>(true, "ok", data);
     }
 
     public static <T> GameResult<T> fail(String reason) {

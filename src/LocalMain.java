@@ -1,8 +1,8 @@
-import input.GameFactory;
+import local.LocalGameFactory;
 
-public class Main {
+public class LocalMain {
     public static void main(String[] args) {
-        GameFactory factory = new GameFactory();
+        LocalGameFactory factory = new LocalGameFactory();
         factory.initializeStandardBoard();
         factory.getPrinter().printGUI();
     }

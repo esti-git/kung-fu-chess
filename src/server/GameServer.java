@@ -9,6 +9,7 @@ import protocol.JumpCommand;
 import protocol.LoginResult;
 import protocol.StateCodec;
 import server.logging.ServerLog;
+import config.GameConfig;
 
 import java.net.InetSocketAddress;
 import java.util.HashMap;
@@ -19,8 +20,8 @@ import java.util.concurrent.ScheduledExecutorService;
 
 public class GameServer extends WebSocketServer {
 
-    private static final int TICK_MS = 16;
-    private static final int MAX_ROOM_NAME_LENGTH = 20;
+    private static final int TICK_MS = GameConfig.TICK_MS ;
+    private static final int MAX_ROOM_NAME_LENGTH = GameConfig.MAX_ROOM_NAME_LENGTH;
 
     private final PlayerRepository repository;
     private final Object globalLock = new Object();
@@ -174,7 +175,7 @@ public class GameServer extends WebSocketServer {
             newBlack.setColor(PieceColor.BLACK);
             newBlack.setState(SessionState.PLAYING);
 
-            Room room = roomRegistry.createRoom(GameSource.MATCHMAKING, repository, scheduler);
+            Room room = roomRegistry.createRoom(repository, scheduler);
             room.seatMatch(first.getKey(), newWhite, second.getKey(), newBlack);
             roomRegistry.bind(first.getKey(), room.roomId);
             roomRegistry.bind(second.getKey(), room.roomId);
@@ -182,22 +183,32 @@ public class GameServer extends WebSocketServer {
         }
     }
 
-    private void handleCreateRoom(WebSocket conn, String desiredRoomId) {
+    private PlayerSession requireIdleSession(WebSocket conn, String errorMessage) {
         PlayerSession session = sessionsByConn.get(conn);
         if (session == null || session.getState() != SessionState.IDLE) {
-            conn.send(StateCodec.encodeRoomError("Log in before creating a room."));
-            return;
+            conn.send(StateCodec.encodeRoomError(errorMessage));
+            return null;
         }
+        return session;
+    }
 
-        String normalizedId = desiredRoomId == null ? "" : desiredRoomId.trim().toUpperCase();
+    private static String normalizeRoomId(String raw) {
+        return raw == null ? "" : raw.trim().toUpperCase();
+    }
+
+    private void handleCreateRoom(WebSocket conn, String desiredRoomId) {
+        PlayerSession session = requireIdleSession(conn, "Log in before creating a room.");
+        if (session == null) return;
+
+        String normalizedId = normalizeRoomId(desiredRoomId);
         Room room;
         if (normalizedId.isEmpty()) {
-            room = roomRegistry.createRoom(GameSource.ROOM_CODE, repository, scheduler);
+            room = roomRegistry.createRoom(repository, scheduler);
         } else if (normalizedId.length() > MAX_ROOM_NAME_LENGTH) {
             conn.send(StateCodec.encodeRoomError("Room name is too long (max " + MAX_ROOM_NAME_LENGTH + " characters)."));
             return;
         } else {
-            room = roomRegistry.createRoomWithId(normalizedId, GameSource.ROOM_CODE, repository, scheduler);
+            room = roomRegistry.createRoomWithId(normalizedId, repository, scheduler);
             if (room == null) {
                 conn.send(StateCodec.encodeRoomError("Room name \"" + normalizedId + "\" is already in use."));
                 return;
@@ -213,12 +224,10 @@ public class GameServer extends WebSocketServer {
     }
 
     private void handleJoinRoom(WebSocket conn, String roomId) {
-        PlayerSession session = sessionsByConn.get(conn);
-        if (session == null || session.getState() != SessionState.IDLE) {
-            conn.send(StateCodec.encodeRoomError("Log in before joining a room."));
-            return;
-        }
-        String normalizedId = roomId == null ? "" : roomId.trim().toUpperCase();
+        PlayerSession session = requireIdleSession(conn, "Log in before joining a room.");
+        if (session == null) return;
+
+        String normalizedId = normalizeRoomId(roomId);
         Room room = roomRegistry.get(normalizedId);
         if (room == null) {
             conn.send(StateCodec.encodeRoomError("Room not found: " + roomId));

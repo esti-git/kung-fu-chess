@@ -9,12 +9,12 @@ public class Knight extends Piece {
         super(id, color, PieceKind.KNIGHT, null);
     }
 
-    @Override public String getRepresentation() { return (getColor() == PieceColor.WHITE ? "w" : "b") + "N"; }
+    @Override protected char code() { return 'N'; }
 
     @Override
     public boolean isMovementPatternLegal(int fromRow, int fromCol, int toRow, int toCol, int totalRows) {
-        int deltaRow = Math.abs(toRow - fromRow);
-        int deltaCol = Math.abs(toCol - fromCol);
+        int deltaRow = rowDelta(fromRow, toRow);
+        int deltaCol = colDelta(fromCol, toCol);
         return (deltaRow == 2 && deltaCol == 1) || (deltaRow == 1 && deltaCol == 2);
     }
 }

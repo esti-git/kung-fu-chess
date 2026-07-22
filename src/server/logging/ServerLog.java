@@ -1,36 +1,21 @@
 package server.logging;
 
-import java.io.IOException;
-import java.util.logging.FileHandler;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.logging.SimpleFormatter;
+import logging.AppLog;
 
 public final class ServerLog {
 
-    private static final Logger LOGGER = Logger.getLogger("server");
-
-    static {
-        try {
-            FileHandler handler = new FileHandler("server.log", true);
-            handler.setFormatter(new SimpleFormatter());
-            LOGGER.addHandler(handler);
-            LOGGER.setLevel(Level.ALL);
-        } catch (IOException e) {
-            System.err.println("Could not open server.log: " + e.getMessage());
-        }
-    }
+    private static final AppLog LOG = new AppLog("server", "server.log");
 
     public static void info(String message) {
-        LOGGER.info(message);
+        LOG.info(message);
     }
 
     public static void warn(String message) {
-        LOGGER.warning(message);
+        LOG.warn(message);
     }
 
     public static void error(String message, Throwable t) {
-        LOGGER.log(Level.SEVERE, message, t);
+        LOG.error(message, t);
     }
 
     private ServerLog() {

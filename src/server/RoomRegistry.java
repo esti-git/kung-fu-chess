@@ -18,18 +18,18 @@ public class RoomRegistry {
     private final Map<WebSocket, String> roomIdByConn = new ConcurrentHashMap<>();
     private final BoardSnapshotFactory snapshotFactory = new BoardSnapshotFactory();
 
-    public Room createRoom(GameSource source, PlayerRepository repository, ScheduledExecutorService scheduler) {
+    public Room createRoom(PlayerRepository repository, ScheduledExecutorService scheduler) {
         String roomId;
         Room room;
         do {
             roomId = generateId();
-            room = new Room(roomId, source, repository, scheduler, snapshotFactory);
+            room = new Room(roomId, repository, scheduler, snapshotFactory);
         } while (rooms.putIfAbsent(roomId, room) != null);
         return room;
     }
 
-    public Room createRoomWithId(String roomId, GameSource source, PlayerRepository repository, ScheduledExecutorService scheduler) {
-        Room room = new Room(roomId, source, repository, scheduler, snapshotFactory);
+    public Room createRoomWithId(String roomId, PlayerRepository repository, ScheduledExecutorService scheduler) {
+        Room room = new Room(roomId, repository, scheduler, snapshotFactory);
         return rooms.putIfAbsent(roomId, room) == null ? room : null;
     }
 

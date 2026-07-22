@@ -1,10 +1,10 @@
-package input;
+package local;
 
 import engine.GameEngine;
 
 import javax.swing.Timer;
 
-public class GameLoop {
+public class LocalGameLoop {
 
     private static final int TICK_MS = 16;
     private static final int RESTART_DELAY_MS = 3000;
@@ -17,7 +17,7 @@ public class GameLoop {
     private long lastSystemTime;
     private boolean gameOverHandled;
 
-    public GameLoop(GameEngine engine, Runnable onTick) {
+    public LocalGameLoop(GameEngine engine, Runnable onTick) {
         this.engine = engine;
         this.onTick = onTick;
     }

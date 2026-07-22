@@ -1,7 +1,6 @@
 import org.java_websocket.WebSocket;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import server.GameSource;
 import server.PlayerRepository;
 import server.Room;
 import server.RoomRegistry;
@@ -24,7 +23,7 @@ class RoomRegistryTest {
 
     @Test
     void testCreateRoomGeneratesRetrievableRoom() {
-        Room room = registry.createRoom(GameSource.MATCHMAKING, repository, scheduler);
+        Room room = registry.createRoom(repository, scheduler);
 
         assertNotNull(room);
         assertNotNull(registry.get(room.roomId));
@@ -33,7 +32,7 @@ class RoomRegistryTest {
 
     @Test
     void testCreateRoomWithIdSucceedsOnce() {
-        Room room = registry.createRoomWithId("MYROOM", GameSource.ROOM_CODE, repository, scheduler);
+        Room room = registry.createRoomWithId("MYROOM", repository, scheduler);
 
         assertNotNull(room);
         assertEquals("MYROOM", room.roomId);
@@ -41,8 +40,8 @@ class RoomRegistryTest {
 
     @Test
     void testCreateRoomWithIdReturnsNullOnDuplicate() {
-        registry.createRoomWithId("MYROOM", GameSource.ROOM_CODE, repository, scheduler);
-        Room duplicate = registry.createRoomWithId("MYROOM", GameSource.ROOM_CODE, repository, scheduler);
+        registry.createRoomWithId("MYROOM", repository, scheduler);
+        Room duplicate = registry.createRoomWithId("MYROOM", repository, scheduler);
 
         assertNull(duplicate);
     }
@@ -54,7 +53,7 @@ class RoomRegistryTest {
 
     @Test
     void testBindAndRoomForReturnsBoundRoom() {
-        Room room = registry.createRoom(GameSource.MATCHMAKING, repository, scheduler);
+        Room room = registry.createRoom(repository, scheduler);
         WebSocket conn = new FakeWebSocket().socket();
 
         registry.bind(conn, room.roomId);
@@ -64,7 +63,7 @@ class RoomRegistryTest {
 
     @Test
     void testUnbindClearsBinding() {
-        Room room = registry.createRoom(GameSource.MATCHMAKING, repository, scheduler);
+        Room room = registry.createRoom(repository, scheduler);
         WebSocket conn = new FakeWebSocket().socket();
         registry.bind(conn, room.roomId);
 
@@ -81,7 +80,7 @@ class RoomRegistryTest {
 
     @Test
     void testRemoveIfEmptyRemovesOnlyEmptyRooms() {
-        Room room = registry.createRoom(GameSource.MATCHMAKING, repository, scheduler);
+        Room room = registry.createRoom(repository, scheduler);
         FakeWebSocket white = new FakeWebSocket();
         room.seatCreator(white.socket(), new server.PlayerSession("alice", 1200));
 
@@ -95,8 +94,8 @@ class RoomRegistryTest {
 
     @Test
     void testAllRoomsReflectsCreatedRooms() {
-        Room roomA = registry.createRoom(GameSource.MATCHMAKING, repository, scheduler);
-        Room roomB = registry.createRoom(GameSource.MATCHMAKING, repository, scheduler);
+        Room roomA = registry.createRoom(repository, scheduler);
+        Room roomB = registry.createRoom(repository, scheduler);
 
         assertTrue(registry.allRooms().contains(roomA));
         assertTrue(registry.allRooms().contains(roomB));

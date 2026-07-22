@@ -1,5 +1,6 @@
 package view;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 
 import java.util.Collections;
@@ -9,6 +10,7 @@ import java.util.List;
 public class BoardSnapshot {
     private final int rows;
     private final int cols;
+    @Getter(AccessLevel.NONE)
     private final PieceSnapshot[][] cells;
     private final List<PendingMoveSnapshot> pendingMoves;
     private final List<PendingJumpSnapshot> pendingJumps;

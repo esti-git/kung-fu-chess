@@ -26,10 +26,23 @@ public abstract class Piece {
         this.state = PieceState.IDLE;
     }
 
-    public abstract String getRepresentation();
     public abstract boolean isMovementPatternLegal(int fromRow, int fromCol, int toRow, int toCol, int totalRows);
 
     public boolean isSlidingPiece() { return false; }
+
+    protected abstract char code();
+
+    public String getRepresentation() {
+        return (getColor() == PieceColor.WHITE ? "w" : "b") + code();
+    }
+
+    protected static int rowDelta(int fromRow, int toRow) {
+        return Math.abs(toRow - fromRow);
+    }
+
+    protected static int colDelta(int fromCol, int toCol) {
+        return Math.abs(toCol - fromCol);
+    }
 
     public String validateSpecialMove(Board board, Position source, Position destination, Piece destinationPiece, List<PendingMove> pendingMoves) {
         return null;

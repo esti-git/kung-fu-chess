@@ -4,7 +4,6 @@ import enums.PieceColor;
 import events.Event;
 import events.EventBus;
 import events.MoveMadeEvent;
-import model.Position;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,17 +33,7 @@ public class MoveHistoryTracker {
         MoveMadeEvent move = (MoveMadeEvent) event;
         List<String> targetList = (move.getPlayer() == PieceColor.WHITE) ? whiteMoves : blackMoves;
         String entry = (targetList.size() + 1) + ". " + move.getPieceRepresentation()
-                + " " + toSquare(move.getFrom(), move.getBoardRows()) + "-" + toSquare(move.getTo(), move.getBoardRows());
+                + " " + move.getFrom().toAlgebraic(move.getBoardRows()) + "-" + move.getTo().toAlgebraic(move.getBoardRows());
         targetList.add(entry);
-    }
-
-    private String toSquare(Position pos, int rows) {
-        return toSquare(pos.getRow(), pos.getCol(), rows);
-    }
-
-    private String toSquare(int row, int col, int rows) {
-        char file = (char) ('a' + col);
-        int rank = rows - row;
-        return "" + file + rank;
     }
 }

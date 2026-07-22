@@ -9,13 +9,11 @@ public class Queen extends Piece {
         super(id, color, PieceKind.QUEEN, null);
     }
 
-    @Override public String getRepresentation() { return (getColor() == PieceColor.WHITE ? "w" : "b") + "Q"; }
+    @Override protected char code() { return 'Q'; }
 
     @Override
     public boolean isMovementPatternLegal(int fromRow, int fromCol, int toRow, int toCol, int totalRows) {
-        int deltaRow = Math.abs(toRow - fromRow);
-        int deltaCol = Math.abs(toCol - fromCol);
-        return (fromRow == toRow || fromCol == toCol) || (deltaRow == deltaCol);
+        return Rook.isStraightLine(fromRow, fromCol, toRow, toCol) || Bishop.isDiagonal(fromRow, fromCol, toRow, toCol);
     }
 
     @Override public boolean isSlidingPiece() { return true; }

@@ -1,23 +1,22 @@
-package input;
+package local;
 
 import engine.GameEngine;
 import common.GameResult;
-import view.BoardPrinter;
 import model.Piece;
 import model.Position;
+import view.SelectionState;
 
-public class Controller {
+public class LocalController {
 
     private final GameEngine engine;
-    private final BoardMapper boardMapper;
-    private final BoardPrinter printer;
-    private Position selectedPosition;
+    private final LocalBoardMapper boardMapper;
+    private final LocalBoardPrinter printer;
+    private final SelectionState selection = new SelectionState();
 
-    public Controller(GameEngine engine, BoardMapper boardMapper, BoardPrinter printer) {
+    public LocalController(GameEngine engine, LocalBoardMapper boardMapper, LocalBoardPrinter printer) {
         this.engine = engine;
         this.boardMapper = boardMapper;
         this.printer = printer;
-        this.selectedPosition = null;
     }
 
     public void handleRawClick(String[] parts) {
@@ -40,19 +39,19 @@ public class Controller {
 
     public void click(int x, int y) {
         boardMapper.pixelToCell(x, y).ifPresent(position -> {
-            if (selectedPosition == null) {
+            if (!selection.isSelected()) {
                 trySelect(position);
                 printer.printGUI();
                 return;
             }
 
-            if (selectedPosition.equals(position)) {
+            if (selection.isSameAsSelected(position)) {
                 clearSelection();
                 printer.printGUI();
                 return;
             }
 
-            Piece selectedPiece = engine.pieceAt(selectedPosition).orElse(null);
+            Piece selectedPiece = engine.pieceAt(selection.get()).orElse(null);
             Piece clickedPiece = engine.pieceAt(position).orElse(null);
 
             if (selectedPiece != null && clickedPiece != null && selectedPiece.getColor() == clickedPiece.getColor()) {
@@ -61,7 +60,7 @@ public class Controller {
                 return;
             }
 
-            engine.requestMove(selectedPosition, position);
+            engine.requestMove(selection.get(), position);
 
             clearSelection();
             printer.printGUI();
@@ -86,7 +85,7 @@ public class Controller {
 
         engine.pieceAt(position).ifPresentOrElse(piece -> {
             if (piece.getState() == enums.PieceState.IDLE) {
-                selectedPosition = position;
+                selection.select(position);
             } else {
                 clearSelection();
             }
@@ -94,10 +93,10 @@ public class Controller {
     }
 
     public Position selectedPosition() {
-        return selectedPosition;
+        return selection.get();
     }
 
     public void clearSelection() {
-        selectedPosition = null;
+        selection.clear();
     }
 }

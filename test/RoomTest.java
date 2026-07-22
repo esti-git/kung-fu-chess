@@ -2,12 +2,11 @@ import engine.GameEngine;
 import enums.PieceColor;
 import enums.PlayerRole;
 import events.GameEndedEvent;
-import input.GameFactory;
+import engine.GameFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import protocol.NetworkState;
 import protocol.StateCodec;
-import server.GameSource;
 import server.PlayerRepository;
 import server.PlayerSession;
 import server.Room;
@@ -36,7 +35,7 @@ class RoomTest {
     }
 
     private Room newRoom(PlayerRepository repository) {
-        return registry.createRoom(GameSource.MATCHMAKING, repository, scheduler);
+        return registry.createRoom(repository, scheduler);
     }
 
     private GameEngine engineOf(Room room) throws Exception {

@@ -162,6 +162,18 @@ public class RealTimeArbiter {
         return kingCaptured;
     }
 
+    private boolean captureAndCheckKing(Piece attacker, Piece captured, Position at) {
+        board.removePiece(at);
+        captureLog.add(new CaptureRecord(captured.getColor(), captured.getKind()));
+        eventBus.publish(new PieceCapturedEvent(captured.getColor(), captured.getKind(), attacker.getColor()));
+        if (captured.getKind() == PieceKind.KING) {
+            winnerColor = attacker.getColor();
+            eventBus.publish(new GameEndedEvent(winnerColor));
+            return true;
+        }
+        return false;
+    }
+
     private boolean processMove(PendingMove move) {
         Piece movingPiece = move.getPiece();
         if (movingPiece.getState() == PieceState.CAPTURED) return false;
@@ -182,14 +194,7 @@ public class RealTimeArbiter {
 
                 board.clearCellOnly(destination);
             } else {
-                board.removePiece(destination);
-                captureLog.add(new CaptureRecord(target.getColor(), target.getKind()));
-                eventBus.publish(new PieceCapturedEvent(target.getColor(), target.getKind(), movingPiece.getColor()));
-                if (target.getKind() == PieceKind.KING) {
-                    kingCaptured = true;
-                    winnerColor = movingPiece.getColor();
-                    eventBus.publish(new GameEndedEvent(winnerColor));
-                }
+                kingCaptured = captureAndCheckKing(movingPiece, target, destination);
             }
         }
 
@@ -217,15 +222,7 @@ public class RealTimeArbiter {
         } else if (existingPiece == piece) {
 
         } else if (existingPiece.getColor() != piece.getColor()) {
-            board.removePiece(jumpPosition);
-            captureLog.add(new CaptureRecord(existingPiece.getColor(), existingPiece.getKind()));
-            eventBus.publish(new PieceCapturedEvent(existingPiece.getColor(), existingPiece.getKind(), piece.getColor()));
-            if (existingPiece.getKind() == PieceKind.KING) {
-                kingCaptured = true;
-                winnerColor = piece.getColor();
-                eventBus.publish(new GameEndedEvent(winnerColor));
-            }
-
+            kingCaptured = captureAndCheckKing(piece, existingPiece, jumpPosition);
             board.addPiece(jumpPosition, piece);
         } else {
             Position originalPos = piece.getCell();

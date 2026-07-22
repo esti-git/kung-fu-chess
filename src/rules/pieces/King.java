@@ -9,12 +9,12 @@ public class King extends Piece {
         super(id, color, PieceKind.KING, null);
     }
 
-    @Override public String getRepresentation() { return (getColor() == PieceColor.WHITE ? "w" : "b") + "K"; }
+    @Override protected char code() { return 'K'; }
 
     @Override
     public boolean isMovementPatternLegal(int fromRow, int fromCol, int toRow, int toCol, int totalRows) {
-        int deltaRow = Math.abs(toRow - fromRow);
-        int deltaCol = Math.abs(toCol - fromCol);
+        int deltaRow = rowDelta(fromRow, toRow);
+        int deltaCol = colDelta(fromCol, toCol);
         return deltaRow <= 1 && deltaCol <= 1;
     }
 }

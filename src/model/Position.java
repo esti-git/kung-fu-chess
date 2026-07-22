@@ -25,4 +25,10 @@ public class Position {
     public String toString() {
         return "[" + row + ", " + col + "]";
     }
+
+    public String toAlgebraic(int totalRows) {
+        char file = (char) ('a' + col);
+        int rank = totalRows - row;
+        return "" + file + rank;
+    }
 }

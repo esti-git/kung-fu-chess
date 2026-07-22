@@ -10,29 +10,19 @@ import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Color;
 import java.awt.RenderingHints;
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class BoardRenderer {
 
-    private static final int DEFAULT_FPS = 6;
-    private static final Pattern FPS_PATTERN = Pattern.compile("\"frames_per_sec\"\\s*:\\s*([0-9]+(\\.[0-9]+)?)");
-    private static final Pattern IS_LOOP_PATTERN = Pattern.compile("\"is_loop\"\\s*:\\s*(true|false)");
     private static final int LABEL_MARGIN = GameConfig.BOARD_LABEL_MARGIN;
 
     private final int cellSize;
 
     private final Map<String, Img> imageCache = new HashMap<>();
     private final Map<String, Boolean> warnedPaths = new HashMap<>();
-    private final Map<String, Integer> frameCountCache = new HashMap<>();
-    private final Map<String, Integer> fpsCache = new HashMap<>();
-    private final Map<String, Boolean> loopCache = new HashMap<>();
     private final Map<String, Img> boardImageCache = new HashMap<>();
+    private final SpriteConfigLoader spriteConfig = new SpriteConfigLoader();
 
     public BoardRenderer() {
         this.cellSize = GameConfig.CELL_SIZE;
@@ -238,9 +228,9 @@ public class BoardRenderer {
 
         String folderName = getNormalizedFolderName(piece.getRepresentation());
 
-        int totalFrames = getFrameCount(folderName, stateFolder);
-        int fps = getFramesPerSec(folderName, stateFolder);
-        boolean loop = isLoop(folderName, stateFolder);
+        int totalFrames = spriteConfig.getFrameCount(folderName, stateFolder);
+        int fps = spriteConfig.getFramesPerSec(folderName, stateFolder);
+        boolean loop = spriteConfig.isLoop(folderName, stateFolder);
         int frameDelayMs = Math.max(1, Math.round(1000f / fps));
 
         long frameNumber = Math.max(0, elapsedMs) / frameDelayMs;
@@ -324,66 +314,6 @@ public class BoardRenderer {
 
     private double clamp01(double v) {
         return Math.max(0.0, Math.min(1.0, v));
-    }
-
-    private int getFrameCount(String folderName, String stateFolder) {
-        String key = folderName + "/" + stateFolder;
-        Integer cached = frameCountCache.get(key);
-        if (cached != null) return cached;
-
-        File spritesDir = new File(String.format("assets/%s/states/%s/sprites", folderName, stateFolder));
-        File[] files = spritesDir.listFiles((dir, name) -> name.matches("\\d+\\.png"));
-        int count = (files != null && files.length > 0) ? files.length : 1;
-
-        frameCountCache.put(key, count);
-        return count;
-    }
-
-    private int getFramesPerSec(String folderName, String stateFolder) {
-        String key = folderName + "/" + stateFolder;
-        Integer cached = fpsCache.get(key);
-        if (cached != null) return cached;
-
-        int fps = DEFAULT_FPS;
-        String config = readStateConfig(folderName, stateFolder);
-        if (config != null) {
-            Matcher m = FPS_PATTERN.matcher(config);
-            if (m.find()) {
-                fps = (int) Math.round(Double.parseDouble(m.group(1)));
-            }
-        }
-        if (fps <= 0) fps = DEFAULT_FPS;
-
-        fpsCache.put(key, fps);
-        return fps;
-    }
-
-    private boolean isLoop(String folderName, String stateFolder) {
-        String key = folderName + "/" + stateFolder;
-        Boolean cached = loopCache.get(key);
-        if (cached != null) return cached;
-
-        boolean loop = true;
-        String config = readStateConfig(folderName, stateFolder);
-        if (config != null) {
-            Matcher m = IS_LOOP_PATTERN.matcher(config);
-            if (m.find()) {
-                loop = Boolean.parseBoolean(m.group(1));
-            }
-        }
-
-        loopCache.put(key, loop);
-        return loop;
-    }
-
-    private String readStateConfig(String folderName, String stateFolder) {
-        File configFile = new File(String.format("assets/%s/states/%s/config.json", folderName, stateFolder));
-        if (!configFile.exists()) return null;
-        try {
-            return new String(Files.readAllBytes(configFile.toPath()));
-        } catch (IOException e) {
-            return null;
-        }
     }
 
     private Img getCachedImage(String path) throws Exception {

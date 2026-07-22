@@ -1,19 +1,16 @@
-package input;
+package view;
 
 import config.GameConfig;
-import model.Board;
 import model.Position;
+
 import java.util.Optional;
 
-public class BoardMapper {
+public final class BoardMapper {
 
-    private final Board board;
-
-    public BoardMapper(Board board) {
-        this.board = board;
+    private BoardMapper() {
     }
 
-    public Optional<Position> pixelToCell(int x, int y) {
+    public static Optional<Position> pixelToCell(int x, int y, int rows, int cols) {
         int cellSize = GameConfig.CELL_SIZE;
         int margin = GameConfig.BOARD_LABEL_MARGIN;
 
@@ -26,7 +23,7 @@ public class BoardMapper {
         int col = adjustedX / cellSize;
         int row = adjustedY / cellSize;
 
-        if (row >= 0 && row < board.getRows() && col >= 0 && col < board.getCols()) {
+        if (row >= 0 && row < rows && col >= 0 && col < cols) {
             return Optional.of(new Position(row, col));
         }
 

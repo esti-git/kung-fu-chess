@@ -1,4 +1,4 @@
-package input;
+package local;
 
 import io.BoardParser;
 import model.Piece;
@@ -7,14 +7,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
-public class InputHandler {
+public class LocalInputHandler {
 
-    private final GameFactory factory;
+    private final LocalGameFactory factory;
     private final BoardParser boardParser;
-    private final CommandRegistry registry;
+    private final LocalCommandRegistry registry;
 
-    public InputHandler() {
-        this.factory = new GameFactory();
+    public LocalInputHandler() {
+        this.factory = new LocalGameFactory();
         this.boardParser = factory.getBoardParser();
         this.registry = factory.getRegistry();
     }
@@ -28,7 +28,7 @@ public class InputHandler {
 
         while (scanner.hasNextLine()) {
             String line = scanner.nextLine().trim();
-            
+
             if (line.equalsIgnoreCase("exit") || line.equalsIgnoreCase("end")) {
                 break;
             }
@@ -61,7 +61,7 @@ public class InputHandler {
                 if (parts.length > 0) {
                     registry.dispatch(parts[0], parts);
                 }
-                
+
                 if (parts.length > 0 && parts[0].equals("print")) {
                     break;
                 }

@@ -9,14 +9,16 @@ public class Bishop extends Piece {
         super(id, color, PieceKind.BISHOP, null);
     }
 
-    @Override public String getRepresentation() { return (getColor() == PieceColor.WHITE ? "w" : "b") + "B"; }
+    @Override protected char code() { return 'B'; }
 
     @Override
     public boolean isMovementPatternLegal(int fromRow, int fromCol, int toRow, int toCol, int totalRows) {
-        int deltaRow = Math.abs(toRow - fromRow);
-        int deltaCol = Math.abs(toCol - fromCol);
-        return deltaRow == deltaCol;
+        return isDiagonal(fromRow, fromCol, toRow, toCol);
     }
 
     @Override public boolean isSlidingPiece() { return true; }
+
+    static boolean isDiagonal(int fromRow, int fromCol, int toRow, int toCol) {
+        return rowDelta(fromRow, toRow) == colDelta(fromCol, toCol);
+    }
 }

@@ -1,6 +1,6 @@
 import enums.PieceColor;
 import enums.PieceKind;
-import input.GameFactory;
+import engine.GameFactory;
 import org.junit.jupiter.api.Test;
 import view.BoardSnapshot;
 import view.BoardSnapshotFactory;

@@ -11,4 +11,7 @@ public class GameConfig {
     public static final int SEEK_TIMEOUT_SECONDS = 60;
     public static final int DISCONNECT_GRACE_SECONDS = 60;
     public static final int RATING_RANGE = 100;
+
+    public static final int TICK_MS = 16;
+    public static final int MAX_ROOM_NAME_LENGTH = 20;
 }
