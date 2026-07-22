@@ -3,6 +3,7 @@ package protocol;
 import enums.PieceColor;
 import enums.PieceKind;
 import enums.PieceState;
+import enums.PlayerRole;
 import events.Event;
 import events.GameEndedEvent;
 import events.GameStartedEvent;
@@ -21,7 +22,6 @@ import view.PieceSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 
-/** JSON wire format for broadcasting {@link BoardSnapshot} from the server to thin clients. */
 public class StateCodec {
 
     public static String encodeState(BoardSnapshot snapshot, boolean gameOver, PieceColor winnerColor) {
@@ -117,7 +117,7 @@ public class StateCodec {
                 GameEndedEvent e = (GameEndedEvent) event;
                 root.put("winnerColor", e.getWinnerColor() == null ? JSONObject.NULL : e.getWinnerColor().name());
             }
-            case GameStartedEvent.TYPE -> { /* no fields */ }
+            case GameStartedEvent.TYPE -> {}
             default -> throw new IllegalArgumentException("Unknown event type: " + event.getType());
         }
 
@@ -152,6 +152,26 @@ public class StateCodec {
         }
     }
 
+    public static String encodeHistory(List<String> eventJsons) {
+        JSONObject root = new JSONObject();
+        root.put("type", "history");
+        JSONArray events = new JSONArray();
+        for (String eventJson : eventJsons) {
+            events.put(new JSONObject(eventJson));
+        }
+        root.put("events", events);
+        return root.toString();
+    }
+
+    public static List<Event> decodeHistoryEvents(String rawJson) {
+        JSONObject root = new JSONObject(rawJson);
+        List<Event> events = new ArrayList<>();
+        for (Object o : root.getJSONArray("events")) {
+            events.add(decodeEvent(((JSONObject) o).toString()));
+        }
+        return events;
+    }
+
     public static String encodeError(String message) {
         JSONObject root = new JSONObject();
         root.put("type", "error");
@@ -175,12 +195,13 @@ public class StateCodec {
         return new JSONObject(rawJson).optString("password", "");
     }
 
-    public static String encodeLoginResult(boolean success, int rating, String message) {
+    public static String encodeLoginResult(boolean success, int rating, String message, boolean reconnected) {
         JSONObject root = new JSONObject();
         root.put("type", "loginResult");
         root.put("success", success);
         root.put("rating", rating);
         root.put("message", message == null ? JSONObject.NULL : message);
+        root.put("reconnected", reconnected);
         return root.toString();
     }
 
@@ -189,7 +210,8 @@ public class StateCodec {
         boolean success = root.optBoolean("success", false);
         int rating = root.optInt("rating", 0);
         String message = root.isNull("message") ? null : root.optString("message", null);
-        return new LoginResult(success, rating, message);
+        boolean reconnected = root.optBoolean("reconnected", false);
+        return new LoginResult(success, rating, message, reconnected);
     }
 
     public static String encodeAssign(PieceColor color, String whiteName, String blackName, int whiteRating, int blackRating) {
@@ -233,6 +255,12 @@ public class StateCodec {
         return root.toString();
     }
 
+    public static String encodePlayAgain() {
+        JSONObject root = new JSONObject();
+        root.put("type", "playAgain");
+        return root.toString();
+    }
+
     public static String encodeSeekTimeout(String message) {
         JSONObject root = new JSONObject();
         root.put("type", "seekTimeout");
@@ -249,6 +277,67 @@ public class StateCodec {
 
     public static int decodeDisconnectCountdownSeconds(String rawJson) {
         return new JSONObject(rawJson).optInt("seconds", 0);
+    }
+
+    public static String encodeCreateRoom(String desiredRoomId) {
+        JSONObject root = new JSONObject();
+        root.put("type", "createRoom");
+        root.put("roomId", desiredRoomId == null ? "" : desiredRoomId);
+        return root.toString();
+    }
+
+    public static String decodeCreateRoomId(String rawJson) {
+        return new JSONObject(rawJson).optString("roomId", "");
+    }
+
+    public static String encodeJoinRoom(String roomId) {
+        JSONObject root = new JSONObject();
+        root.put("type", "joinRoom");
+        root.put("roomId", roomId);
+        return root.toString();
+    }
+
+    public static String decodeJoinRoomId(String rawJson) {
+        return new JSONObject(rawJson).optString("roomId", "");
+    }
+
+    public static String encodeRoomJoined(String roomId, PlayerRole role) {
+        JSONObject root = new JSONObject();
+        root.put("type", "roomJoined");
+        root.put("roomId", roomId);
+        root.put("role", role.name());
+        return root.toString();
+    }
+
+    public static RoomJoined decodeRoomJoined(String rawJson) {
+        JSONObject root = new JSONObject(rawJson);
+        return new RoomJoined(root.getString("roomId"), PlayerRole.valueOf(root.getString("role")));
+    }
+
+    public static String encodeRoomError(String message) {
+        JSONObject root = new JSONObject();
+        root.put("type", "roomError");
+        root.put("message", message);
+        return root.toString();
+    }
+
+    public static String encodeSpectate(String whiteName, String blackName, int whiteRating, int blackRating) {
+        JSONObject root = new JSONObject();
+        root.put("type", "spectate");
+        root.put("whiteName", whiteName == null ? JSONObject.NULL : whiteName);
+        root.put("blackName", blackName == null ? JSONObject.NULL : blackName);
+        root.put("whiteRating", whiteRating);
+        root.put("blackRating", blackRating);
+        return root.toString();
+    }
+
+    public static SpectateInfo decodeSpectate(String rawJson) {
+        JSONObject root = new JSONObject(rawJson);
+        String whiteName = root.isNull("whiteName") ? null : root.getString("whiteName");
+        String blackName = root.isNull("blackName") ? null : root.getString("blackName");
+        int whiteRating = root.optInt("whiteRating", 1200);
+        int blackRating = root.optInt("blackRating", 1200);
+        return new SpectateInfo(whiteName, blackName, whiteRating, blackRating);
     }
 
     public static String peekType(String rawJson) {

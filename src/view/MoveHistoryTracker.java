@@ -26,6 +26,10 @@ public class MoveHistoryTracker {
         blackMoves.clear();
     }
 
+    public void applyMoveMade(Event event) {
+        onMoveMade(event);
+    }
+
     private void onMoveMade(Event event) {
         MoveMadeEvent move = (MoveMadeEvent) event;
         List<String> targetList = (move.getPlayer() == PieceColor.WHITE) ? whiteMoves : blackMoves;

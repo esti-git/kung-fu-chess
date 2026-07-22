@@ -1,6 +1,7 @@
 package client;
 
 import audio.SoundManager;
+import client.logging.ClientLog;
 import config.GameConfig;
 import enums.PieceColor;
 import events.Event;
@@ -16,6 +17,8 @@ import protocol.LoginResult;
 import protocol.MoveCommand;
 import protocol.NetworkState;
 import protocol.PieceCodes;
+import protocol.RoomJoined;
+import protocol.SpectateInfo;
 import view.BoardRenderer;
 import view.BoardSnapshot;
 import view.GameAnimationController;
@@ -26,6 +29,7 @@ import view.ScaledImagePanel;
 import view.ScoreTracker;
 
 import javax.swing.BorderFactory;
+import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -40,6 +44,7 @@ import javax.swing.border.TitledBorder;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
@@ -51,12 +56,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 
-/**
- * Renders whatever {@link BoardSnapshot} the server last sent and sends clicks as move commands.
- * Republishes server-broadcast game events onto a local {@link EventBus} so the same
- * move-history/score/sound/animation components used by the single-player {@link view.BoardPrinter}
- * work unchanged here.
- */
 public class ClientView {
 
     private static final int HISTORY_PANEL_WIDTH = 190;
@@ -88,6 +87,11 @@ public class ClientView {
     private volatile boolean gameOver;
     private boolean disconnectNotified;
 
+    private boolean spectator;
+    private String roomId;
+    private JLabel roomLabel;
+    private JButton playAgainButton;
+
     private JDialog countdownDialog;
     private JLabel countdownLabel;
     private Timer countdownTimer;
@@ -108,8 +112,17 @@ public class ClientView {
     public ClientView() {
         eventBus.subscribe(MoveMadeEvent.TYPE, event -> refreshHistoryPanelsOnEdt());
         eventBus.subscribe(PieceCapturedEvent.TYPE, event -> refreshHistoryPanelsOnEdt());
-        eventBus.subscribe(GameStartedEvent.TYPE, event -> SwingUtilities.invokeLater(this::repaintBoard));
-        eventBus.subscribe(GameEndedEvent.TYPE, event -> SwingUtilities.invokeLater(this::repaintBoard));
+        eventBus.subscribe(GameStartedEvent.TYPE, event -> SwingUtilities.invokeLater(() -> {
+            gameOver = false;
+            disconnectNotified = false;
+            if (playAgainButton != null) playAgainButton.setVisible(false);
+            repaintBoard();
+        }));
+        eventBus.subscribe(GameEndedEvent.TYPE, event -> SwingUtilities.invokeLater(() -> {
+            gameOver = true;
+            if (playAgainButton != null && !spectator) playAgainButton.setVisible(true);
+            repaintBoard();
+        }));
     }
 
     public void setClient(GameClient client) {
@@ -132,9 +145,26 @@ public class ClientView {
             westPanel = buildSidePanel(whiteBorder, whiteMovesArea, whiteScoreLabel);
             eastPanel = buildSidePanel(blackBorder, blackMovesArea, blackScoreLabel);
 
+            roomLabel = new JLabel(" ", SwingConstants.CENTER);
+            roomLabel.setFont(TITLE_FONT);
+            roomLabel.setForeground(PANEL_ACCENT);
+            roomLabel.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
+
+            playAgainButton = new JButton("Play Again");
+            playAgainButton.setFont(playAgainButton.getFont().deriveFont(Font.BOLD, 16f));
+            playAgainButton.setVisible(false);
+            playAgainButton.addActionListener(e -> {
+                if (client != null) client.sendPlayAgain();
+                playAgainButton.setVisible(false);
+            });
+            JPanel southPanel = new JPanel(new FlowLayout());
+            southPanel.add(playAgainButton);
+
+            guiWindow.add(roomLabel, BorderLayout.NORTH);
             guiWindow.add(westPanel, BorderLayout.WEST);
             guiWindow.add(boardPanel, BorderLayout.CENTER);
             guiWindow.add(eastPanel, BorderLayout.EAST);
+            guiWindow.add(southPanel, BorderLayout.SOUTH);
 
             boardPanel.addMouseListener(new MouseAdapter() {
                 @Override
@@ -177,10 +207,22 @@ public class ClientView {
 
     public void onError(String message) {
         System.err.println("Server rejected command: " + message);
+        ClientLog.warn("Server rejected command: " + message);
     }
 
     public void onEvent(Event event) {
         eventBus.publish(event);
+    }
+
+    public void onHistory(java.util.List<Event> events) {
+        for (Event event : events) {
+            if (MoveMadeEvent.TYPE.equals(event.getType())) {
+                historyTracker.applyMoveMade(event);
+            } else if (PieceCapturedEvent.TYPE.equals(event.getType())) {
+                scoreTracker.applyPieceCaptured(event);
+            }
+        }
+        refreshHistoryPanelsOnEdt();
     }
 
     public void onAssign(AssignedIdentity identity) {
@@ -195,10 +237,24 @@ public class ClientView {
         });
     }
 
-    /** "disconnectCountdown" handler: the opponent's socket just dropped. Ticks a local countdown
-     *  down from the seconds the server sent; if the opponent reconnects, onAssign() dismisses
-     *  this dialog, otherwise the server's opponentDisconnected/connection-closed message follows
-     *  once the grace period elapses and drives the usual Game Over dialog. */
+    public void onRoomJoined(RoomJoined joined) {
+        this.roomId = joined.roomId;
+        SwingUtilities.invokeLater(this::applyIdentityLabels);
+    }
+
+    public void onSpectate(SpectateInfo info) {
+        this.spectator = true;
+        this.myColor = null;
+        this.whiteName = info.whiteName;
+        this.blackName = info.blackName;
+        this.whiteRating = info.whiteRating;
+        this.blackRating = info.blackRating;
+        SwingUtilities.invokeLater(() -> {
+            dismissDisconnectCountdown();
+            applyIdentityLabels();
+        });
+    }
+
     public void onDisconnectCountdown(int seconds) {
         SwingUtilities.invokeLater(() -> {
             countdownSecondsLeft = seconds;
@@ -244,6 +300,7 @@ public class ClientView {
 
     public void onRejected(String message) {
         System.err.println("Join rejected: " + message);
+        ClientLog.warn("Join rejected: " + message);
         System.exit(0);
     }
 
@@ -260,8 +317,6 @@ public class ClientView {
         showGameOverOnce(message);
     }
 
-    /** Fires whenever the socket closes, whether the server tore it down after a disconnect or it dropped
-     *  for any other reason - either way the game is over and the board becomes view-only. */
     public void onConnectionClosed(String reason) {
         gameOver = true;
         showGameOverOnce((reason == null || reason.isBlank()) ? "Connection closed. Game over." : reason);
@@ -287,10 +342,16 @@ public class ClientView {
         whiteBorder.setTitle("White - " + white);
         blackBorder.setTitle("Black - " + black);
 
-        if (myColor != null) {
+        if (spectator) {
+            guiWindow.setTitle("Kung Fu Chess - Spectating - " + white + " vs " + black);
+        } else if (myColor != null) {
             String you = myColor == PieceColor.WHITE ? "White" : "Black";
             String yourName = myColor == PieceColor.WHITE ? white : black;
             guiWindow.setTitle("Kung Fu Chess - " + you + " - " + yourName);
+        }
+
+        if (roomLabel != null) {
+            roomLabel.setText(roomId == null ? " " : "Room: " + roomId + (spectator ? "  (spectating)" : ""));
         }
 
         westPanel.repaint();
@@ -314,7 +375,7 @@ public class ClientView {
 
     private void handleClick(int pixelX, int pixelY) {
         BoardSnapshot snapshot = latestSnapshot;
-        if (snapshot == null || client == null || gameOver) return;
+        if (snapshot == null || client == null || gameOver || spectator) return;
 
         Position clicked = pixelToCell(pixelX, pixelY, snapshot.getRows(), snapshot.getCols());
         if (clicked == null) return;
@@ -345,10 +406,9 @@ public class ClientView {
         repaintBoard();
     }
 
-    /** Mirrors input.Controller#jump: a double-click jumps the piece under the cursor in place, bypassing selection. */
     private void handleDoubleClick(int pixelX, int pixelY) {
         BoardSnapshot snapshot = latestSnapshot;
-        if (snapshot == null || client == null || gameOver) return;
+        if (snapshot == null || client == null || gameOver || spectator) return;
 
         Position clicked = pixelToCell(pixelX, pixelY, snapshot.getRows(), snapshot.getCols());
         if (clicked == null) return;
@@ -363,7 +423,6 @@ public class ClientView {
         repaintBoard();
     }
 
-    /** Same pixel math as input.BoardMapper, without requiring a live model.Board - the client has none. */
     private Position pixelToCell(int x, int y, int rows, int cols) {
         int cellSize = GameConfig.CELL_SIZE;
         int margin = GameConfig.BOARD_LABEL_MARGIN;

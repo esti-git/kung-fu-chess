@@ -20,27 +20,44 @@ public class ClientMain {
         ClientView view = new ClientView();
         HomeView home = new HomeView();
         boolean[] boardShown = {false};
+        Runnable showBoardOnce = () -> {
+            home.close();
+            if (!boardShown[0]) {
+                boardShown[0] = true;
+                view.show();
+            }
+        };
 
         GameClient client = new GameClient(new URI(url), username, password, view::onState, view::onError, view::onEvent,
                 identity -> {
-                    home.close();
-                    if (!boardShown[0]) {
-                        boardShown[0] = true;
-                        view.show();
-                    }
+                    showBoardOnce.run();
                     view.onAssign(identity);
                 },
                 view::onRejected, view::onOpponentDisconnected, view::onConnectionClosed,
                 result -> {
                     view.onLoginResult(result);
-                    if (result.success) home.show();
+                    if (result.success && !result.reconnected) home.show();
                 },
-                home::onSeekTimeout, view::onDisconnectCountdown);
+                home::onSeekTimeout, view::onDisconnectCountdown,
+                view::onRoomJoined, home::onRoomError,
+                info -> {
+                    showBoardOnce.run();
+                    view.onSpectate(info);
+                },
+                view::onHistory);
         view.setClient(client);
 
         home.setOnPlay(() -> {
             client.sendSeek();
             home.showSearching();
+        });
+        home.setOnCreateRoom(roomName -> {
+            client.sendCreateRoom(roomName);
+            home.showWaitingForRoom(roomName.isEmpty() ? "Creating room..." : "Creating room \"" + roomName + "\"...");
+        });
+        home.setOnJoinRoom(roomId -> {
+            client.sendJoinRoom(roomId);
+            home.showWaitingForRoom("Joining room " + roomId + "...");
         });
 
         client.connectBlocking();

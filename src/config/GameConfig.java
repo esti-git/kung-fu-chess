@@ -9,6 +9,6 @@ public class GameConfig {
     public static final int BOARD_LABEL_MARGIN = 30;
 
     public static final int SEEK_TIMEOUT_SECONDS = 60;
-    public static final int DISCONNECT_GRACE_SECONDS = 20;
+    public static final int DISCONNECT_GRACE_SECONDS = 60;
     public static final int RATING_RANGE = 100;
 }

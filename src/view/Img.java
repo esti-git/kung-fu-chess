@@ -9,21 +9,17 @@ import java.awt.image.AffineTransformOp;
 import java.io.File;
 import java.io.IOException;
 
-/**
- * Lightweight image‑utility class using only standard JDK APIs.
- */
 public class Img {
 
     private BufferedImage img;
 
-    /* ----------- load & optional resize ----------- */
     public Img read(String path,
                     Dimension targetSize,
                     boolean keepAspect,
-                    Object interpolation /*ignored*/) {
+                    Object interpolation) {
 
         try {
-            img = ImageIO.read(new File(path));                              // :contentReference[oaicite:0]{index=0}
+            img = ImageIO.read(new File(path));
         } catch (IOException e) {
             throw new IllegalArgumentException("Cannot load image: " + path);
         }
@@ -34,7 +30,7 @@ public class Img {
             int w = img.getWidth(), h = img.getHeight();
 
             int nw, nh;
-            if (keepAspect) {                                                // :contentReference[oaicite:1]{index=1}
+            if (keepAspect) {
                 double s = Math.min(tw / (double) w, th / (double) h);
                 nw = (int) Math.round(w * s);
                 nh = (int) Math.round(h * s);
@@ -48,7 +44,7 @@ public class Img {
 
             Graphics2D g = dst.createGraphics();
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                               RenderingHints.VALUE_INTERPOLATION_BILINEAR);   // :contentReference[oaicite:2]{index=2}
+                               RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             g.drawImage(img, 0, 0, nw, nh, null);
             g.dispose();
             img = dst;
@@ -58,13 +54,11 @@ public class Img {
 
     public Img read(String path) { return read(path, null, false, null); }
 
-    /* ----------- wrap an already-built image (e.g. a procedurally generated tile) ----------- */
     public Img wrap(BufferedImage image) {
         this.img = image;
         return this;
     }
 
-    /* ----------- create a blank canvas ----------- */
     public Img blank(int width, int height, Color bgColor) {
         img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         if (bgColor != null) {
@@ -76,7 +70,6 @@ public class Img {
         return this;
     }
 
-    /* ----------- draw this image onto another ----------- */
     public void drawOn(Img other, int x, int y) {
         if (img == null || other.img == null)
             throw new IllegalStateException("Both images must be loaded.");
@@ -86,14 +79,13 @@ public class Img {
             throw new IllegalArgumentException("Patch exceeds destination bounds.");
 
         Graphics2D g = other.img.createGraphics();
-        g.setComposite(AlphaComposite.SrcOver);                               // handles alpha channel :contentReference[oaicite:3]{index=3}
-        g.drawImage(img, x, y, null);                                        // :contentReference[oaicite:4]{index=4}
+        g.setComposite(AlphaComposite.SrcOver);
+        g.drawImage(img, x, y, null);
         g.dispose();
     }
 
-    /* ----------- annotate with text ----------- */
     public void putText(String txt, int x, int y, float fontSize,
-                        Color color, int thickness /*unused in Java2D*/) {
+                        Color color, int thickness) {
 
         if (img == null) throw new IllegalStateException("Image not loaded.");
 
@@ -101,25 +93,23 @@ public class Img {
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
                            RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g.setColor(color);
-        g.setFont(img.getGraphics().getFont().deriveFont(fontSize * 12));     // simple scale
-        g.drawString(txt, x, y);                                             // :contentReference[oaicite:5]{index=5}
+        g.setFont(img.getGraphics().getFont().deriveFont(fontSize * 12));
+        g.drawString(txt, x, y);
         g.dispose();
     }
 
-    /* ----------- display in a Swing window ----------- */
     public void show() {
         if (img == null) throw new IllegalStateException("Image not loaded.");
 
         SwingUtilities.invokeLater(() -> {
             JFrame f = new JFrame("Image");
             f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            f.add(new JLabel(new ImageIcon(img)));                            // :contentReference[oaicite:6]{index=6}
+            f.add(new JLabel(new ImageIcon(img)));
             f.pack();
             f.setLocationRelativeTo(null);
             f.setVisible(true);
         });
     }
 
-    /* ----------- access (optional) ----------- */
     public BufferedImage get() { return img; }
 }

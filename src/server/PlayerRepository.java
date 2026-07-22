@@ -43,9 +43,9 @@ public class PlayerRepository {
                     if (rs.next()) {
                         String storedHash = rs.getString("password");
                         if (!storedHash.equals(hash)) {
-                            return new LoginResult(false, 0, "Incorrect password for '" + username + "'.");
+                            return new LoginResult(false, 0, "Incorrect password for '" + username + "'.", false);
                         }
-                        return new LoginResult(true, rs.getInt("rating"), null);
+                        return new LoginResult(true, rs.getInt("rating"), null, false);
                     }
                 }
             }
@@ -57,9 +57,9 @@ public class PlayerRepository {
                 insert.setInt(3, STARTING_RATING);
                 insert.executeUpdate();
             }
-            return new LoginResult(true, STARTING_RATING, null);
+            return new LoginResult(true, STARTING_RATING, null, false);
         } catch (SQLException e) {
-            return new LoginResult(false, 0, "Login failed: " + e.getMessage());
+            return new LoginResult(false, 0, "Login failed: " + e.getMessage(), false);
         }
     }
 

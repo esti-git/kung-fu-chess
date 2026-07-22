@@ -23,6 +23,10 @@ public class ScoreTracker {
         blackScore = 0;
     }
 
+    public void applyPieceCaptured(Event event) {
+        onPieceCaptured(event);
+    }
+
     private void onPieceCaptured(Event event) {
         PieceCapturedEvent captured = (PieceCapturedEvent) event;
         int value = pointValue(captured.getCapturedKind());
