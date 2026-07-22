@@ -20,8 +20,12 @@ public class PlayerRepository {
     private final Connection connection;
 
     public PlayerRepository() {
+        this(DB_URL);
+    }
+
+    public PlayerRepository(String jdbcUrl) {
         try {
-            connection = DriverManager.getConnection(DB_URL);
+            connection = DriverManager.getConnection(jdbcUrl);
             try (Statement statement = connection.createStatement()) {
                 statement.execute("CREATE TABLE IF NOT EXISTS players (" +
                         "username TEXT PRIMARY KEY, " +
