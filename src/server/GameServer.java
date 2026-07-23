@@ -12,9 +12,6 @@ import server.logging.ServerLog;
 import config.GameConfig;
 
 import java.net.InetSocketAddress;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -28,7 +25,7 @@ public class GameServer extends WebSocketServer {
 
     private volatile boolean running = true;
 
-    private final Map<WebSocket, PlayerSession> sessionsByConn = new HashMap<>();
+    private final SessionRegistry sessionRegistry = new SessionRegistry();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
         Thread thread = new Thread(runnable, "matchmaking-timers");
         thread.setDaemon(true);
@@ -36,26 +33,26 @@ public class GameServer extends WebSocketServer {
     });
     private final Matchmaker matchmaker = new Matchmaker(scheduler);
     private final RoomRegistry roomRegistry = new RoomRegistry();
+    private final MatchService matchService;
 
     public GameServer(int port, PlayerRepository repository) {
         super(new InetSocketAddress(port));
         this.repository = repository;
+        this.matchService = new MatchService(matchmaker, roomRegistry, repository, scheduler);
     }
 
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
-        System.out.println("Client connected: " + conn.getRemoteSocketAddress());
         ServerLog.info("Client connected: " + conn.getRemoteSocketAddress());
     }
 
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
-        System.out.println("Client disconnected: " + conn.getRemoteSocketAddress());
         ServerLog.info("Client disconnected: " + conn.getRemoteSocketAddress());
 
         synchronized (globalLock) {
             matchmaker.remove(conn);
-            sessionsByConn.remove(conn);
+            sessionRegistry.remove(conn);
         }
 
         Room room = roomRegistry.roomFor(conn);
@@ -122,29 +119,36 @@ public class GameServer extends WebSocketServer {
 
         Room reconnectRoom = roomRegistry.findRoomWithDisconnectedUser(name);
         if (reconnectRoom != null) {
-            PlayerSession session = reconnectRoom.findDisconnectedSession(name);
-            reconnectRoom.reconnect(conn, session, result.rating);
-            sessionsByConn.put(conn, session);
-            roomRegistry.bind(conn, reconnectRoom.roomId);
-            conn.send(StateCodec.encodeLoginResult(true, result.rating, null, true));
-            ServerLog.info(name + " reconnected to room " + reconnectRoom.roomId);
-            return;
+            handleReconnectLogin(conn, name, result, reconnectRoom);
+        } else {
+            handleFreshLogin(conn, name, result);
         }
+    }
 
+    private void handleReconnectLogin(WebSocket conn, String name, LoginResult result, Room reconnectRoom) {
+        PlayerSession session = reconnectRoom.findDisconnectedSession(name);
+        reconnectRoom.reconnect(conn, session, result.rating);
+        sessionRegistry.put(conn, session);
+        roomRegistry.bind(conn, reconnectRoom.roomId);
+        conn.send(StateCodec.encodeLoginResult(true, result.rating, null, true));
+        ServerLog.info(name + " reconnected to room " + reconnectRoom.roomId);
+    }
+
+    private void handleFreshLogin(WebSocket conn, String name, LoginResult result) {
         PlayerSession session = new PlayerSession(name, result.rating);
-        sessionsByConn.put(conn, session);
+        sessionRegistry.put(conn, session);
         conn.send(StateCodec.encodeLoginResult(true, result.rating, null, false));
         ServerLog.info("Login: " + name + " (rating " + result.rating + ")");
     }
 
     private void handleSeek(WebSocket conn) {
-        PlayerSession session = sessionsByConn.get(conn);
+        PlayerSession session = sessionRegistry.get(conn);
         if (session == null || session.getState() != SessionState.IDLE) {
             return;
         }
         session.setState(SessionState.SEEKING);
         matchmaker.addWaiting(conn, session, () -> handleSeekTimeout(conn));
-        tryPromoteFromQueue();
+        matchService.tryPromoteFromQueue();
     }
 
     private void handleSeekTimeout(WebSocket conn) {
@@ -160,31 +164,8 @@ public class GameServer extends WebSocketServer {
         }
     }
 
-    private void tryPromoteFromQueue() {
-        List<Map.Entry<WebSocket, PlayerSession>> pair;
-        while ((pair = matchmaker.findCompatiblePair()) != null) {
-            Map.Entry<WebSocket, PlayerSession> first = pair.get(0);
-            Map.Entry<WebSocket, PlayerSession> second = pair.get(1);
-            matchmaker.remove(first.getKey());
-            matchmaker.remove(second.getKey());
-
-            PlayerSession newWhite = first.getValue();
-            PlayerSession newBlack = second.getValue();
-            newWhite.setColor(PieceColor.WHITE);
-            newWhite.setState(SessionState.PLAYING);
-            newBlack.setColor(PieceColor.BLACK);
-            newBlack.setState(SessionState.PLAYING);
-
-            Room room = roomRegistry.createRoom(repository, scheduler);
-            room.seatMatch(first.getKey(), newWhite, second.getKey(), newBlack);
-            roomRegistry.bind(first.getKey(), room.roomId);
-            roomRegistry.bind(second.getKey(), room.roomId);
-            ServerLog.info("Matched " + newWhite.getUsername() + " vs " + newBlack.getUsername() + " into room " + room.roomId);
-        }
-    }
-
     private PlayerSession requireIdleSession(WebSocket conn, String errorMessage) {
-        PlayerSession session = sessionsByConn.get(conn);
+        PlayerSession session = sessionRegistry.get(conn);
         if (session == null || session.getState() != SessionState.IDLE) {
             conn.send(StateCodec.encodeRoomError(errorMessage));
             return null;
@@ -192,15 +173,11 @@ public class GameServer extends WebSocketServer {
         return session;
     }
 
-    private static String normalizeRoomId(String raw) {
-        return raw == null ? "" : raw.trim().toUpperCase();
-    }
-
     private void handleCreateRoom(WebSocket conn, String desiredRoomId) {
         PlayerSession session = requireIdleSession(conn, "Log in before creating a room.");
         if (session == null) return;
 
-        String normalizedId = normalizeRoomId(desiredRoomId);
+        String normalizedId = RoomRegistry.normalizeRoomId(desiredRoomId);
         Room room;
         if (normalizedId.isEmpty()) {
             room = roomRegistry.createRoom(repository, scheduler);
@@ -215,8 +192,7 @@ public class GameServer extends WebSocketServer {
             }
         }
 
-        session.setColor(PieceColor.WHITE);
-        session.setState(SessionState.PLAYING);
+        MatchService.assignAndActivate(session, PieceColor.WHITE);
         room.seatCreator(conn, session);
         roomRegistry.bind(conn, room.roomId);
         conn.send(StateCodec.encodeRoomJoined(room.roomId, PlayerRole.WHITE));
@@ -227,7 +203,7 @@ public class GameServer extends WebSocketServer {
         PlayerSession session = requireIdleSession(conn, "Log in before joining a room.");
         if (session == null) return;
 
-        String normalizedId = normalizeRoomId(roomId);
+        String normalizedId = RoomRegistry.normalizeRoomId(roomId);
         Room room = roomRegistry.get(normalizedId);
         if (room == null) {
             conn.send(StateCodec.encodeRoomError("Room not found: " + roomId));
@@ -249,7 +225,6 @@ public class GameServer extends WebSocketServer {
 
     @Override
     public void onStart() {
-        System.out.println("Game server listening on port " + getPort());
         ServerLog.info("Game server listening on port " + getPort());
     }
 

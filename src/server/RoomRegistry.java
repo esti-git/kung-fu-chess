@@ -18,6 +18,10 @@ public class RoomRegistry {
     private final Map<WebSocket, String> roomIdByConn = new ConcurrentHashMap<>();
     private final BoardSnapshotFactory snapshotFactory = new BoardSnapshotFactory();
 
+    public static String normalizeRoomId(String raw) {
+        return raw == null ? "" : raw.trim().toUpperCase();
+    }
+
     public Room createRoom(PlayerRepository repository, ScheduledExecutorService scheduler) {
         String roomId;
         Room room;

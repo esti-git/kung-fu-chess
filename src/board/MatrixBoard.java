@@ -10,8 +10,15 @@ public class MatrixBoard implements Board {
     private int rows;
     private int cols;
 
-    @Override public int getRows() { return rows; }
-    @Override public int getCols() { return cols; }
+    @Override
+    public int getRows() {
+        return rows;
+    }
+
+    @Override
+    public int getCols() {
+        return cols;
+    }
 
     public void initialize(List<Piece> pieces, int rows, int cols) {
         this.rows = rows;
@@ -41,10 +48,10 @@ public class MatrixBoard implements Board {
     }
 
     @Override
-public void clearCellOnly(Position position) {
-    requireValid(position);
-    matrix[position.getRow()][position.getCol()] = null;
-}
+    public void clearCellOnly(Position position) {
+        requireValid(position);
+        matrix[position.getRow()][position.getCol()] = null;
+    }
 
     @Override
     public Piece removePiece(Position pos) {
